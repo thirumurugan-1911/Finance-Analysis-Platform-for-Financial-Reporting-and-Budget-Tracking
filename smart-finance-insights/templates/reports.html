@@ -1,0 +1,409 @@
+{% extends 'base.html' %}
+{% block title %}Financial Reports - Smart Finance Insights{% endblock %}
+{% block content %}
+{% set months = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-file-earmark-text"></i> Financial Reports</h1>
+        <p class="page-subtitle">Generate and analyze your financial reports</p>
+    </div>
+    <div class="flex gap-2">
+        <a href="{{ url_for('export.export_pdf', report_type=report_type, month=selected_month, year=selected_year) }}" class="btn btn-primary"><i class="bi bi-file-earmark-pdf"></i> Export PDF</a>
+        <a href="{{ url_for('export.export_excel', report_type=report_type, month=selected_month, year=selected_year) }}" class="btn btn-outline"><i class="bi bi-file-earmark-spreadsheet"></i> Export Excel</a>
+    </div>
+</div>
+
+<!-- Report Type Selector + Filters -->
+<div class="card mb-4">
+    <div class="flex gap-2" style="flex-wrap:wrap;">
+        <a href="{{ url_for('reports.index', type='expense') }}" class="btn {% if report_type == 'expense' %}btn-primary{% else %}btn-outline{% endif %}"><i class="bi bi-receipt"></i> Expense Report</a>
+        <a href="{{ url_for('reports.index', type='budget') }}" class="btn {% if report_type == 'budget' %}btn-primary{% else %}btn-outline{% endif %}"><i class="bi bi-wallet2"></i> Budget Report</a>
+        <a href="{{ url_for('reports.index', type='investment') }}" class="btn {% if report_type == 'investment' %}btn-primary{% else %}btn-outline{% endif %}"><i class="bi bi-graph-up"></i> Investment Report</a>
+        <a href="{{ url_for('reports.index', type='goal') }}" class="btn {% if report_type == 'goal' %}btn-primary{% else %}btn-outline{% endif %}"><i class="bi bi-bullseye"></i> Goal Report</a>
+    </div>
+    {% if report_type in ['expense', 'budget'] %}
+    <form method="GET" action="{{ url_for('reports.index') }}" class="form-row mt-3" style="align-items:flex-end;">
+        <input type="hidden" name="type" value="{{ report_type }}">
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label"><i class="bi bi-calendar3"></i> Month</label>
+            <select name="month" class="form-control">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>{{ months[m] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label"><i class="bi bi-calendar3"></i> Year</label>
+            <select name="year" class="form-control">
+                {% for y in range(2023, 2027) %}
+                <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> Apply Filter</button>
+    </form>
+    {% else %}
+    <p class="text-muted mt-3" style="font-size:13px;"><i class="bi bi-info-circle"></i> This report shows all-time data — no period filter required.</p>
+    {% endif %}
+</div>
+
+<!-- ============ EXPENSE REPORT ============ -->
+{% if report_type == 'expense' %}
+<div class="stat-grid">
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+        <p class="stat-label">Total Expense ({{ month_name }} {{ selected_year }})</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total) }}</p>
+        <p class="stat-change negative"><i class="bi bi-arrow-up"></i> Monthly spending</p>
+    </div>
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-list-check"></i></div>
+        <p class="stat-label">Transactions</p>
+        <p class="stat-value">{{ data.count }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-receipt"></i> Total entries</p>
+    </div>
+    <div class="stat-card income">
+        <div class="stat-icon"><i class="bi bi-calculator"></i></div>
+        <p class="stat-label">Average per Transaction</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total / data.count) if data.count else 0 }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-graph-up"></i> Per entry</p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-pie-chart"></i></div>
+        <p class="stat-label">Categories</p>
+        <p class="stat-value">{{ data.cat_summary|length if data.cat_summary else 0 }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-tags"></i> Spending buckets</p>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-pie-chart"></i> Category Summary</h2>
+            <span class="badge badge-secondary">{{ data.cat_summary|length if data.cat_summary else 0 }} categories</span>
+        </div>
+        {% if data.cat_summary %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Category</th><th class="text-center">Count</th><th class="text-right">Amount</th><th>% Share</th></tr>
+                </thead>
+                <tbody>
+                    {% for c in data.cat_summary %}
+                    <tr>
+                        <td><span class="badge badge-primary">{{ c.category }}</span></td>
+                        <td class="text-center">{{ c.count }}</td>
+                        <td class="text-right font-bold">₹{{ "{:,.0f}".format(c.total) }}</td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <div class="progress progress-sm" style="flex:1; min-width:60px;">
+                                    <div class="progress-bar" style="width:{% if data.total %}{{ "%.0f"|format((c.total / data.total) * 100) }}{% else %}0{% endif %}%;"></div>
+                                </div>
+                                <span class="font-semibold" style="min-width:42px; font-size:12px;">{{ "%.1f"|format((c.total / data.total * 100) if data.total else 0) }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background:var(--bg); font-weight:700;">
+                        <td>TOTAL</td>
+                        <td class="text-center">{{ data.count }}</td>
+                        <td class="text-right">₹{{ "{:,.0f}".format(data.total) }}</td>
+                        <td class="text-center">100%</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-inbox"></i><p>No expense data for {{ month_name }} {{ selected_year }}</p></div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-list-ul"></i> Transaction Details</h2>
+            <span class="badge badge-secondary">{{ data.count }} records</span>
+        </div>
+        {% if data.expenses %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Description</th><th>Category</th><th class="text-right">Amount</th></tr>
+                </thead>
+                <tbody>
+                    {% for e in data.expenses %}
+                    <tr>
+                        <td style="font-size:12px; white-space:nowrap;">{{ e.date }}</td>
+                        <td>{{ e.description }}</td>
+                        <td><span class="badge badge-secondary">{{ e.category }}</span></td>
+                        <td class="text-right font-bold text-danger">₹{{ "{:,.0f}".format(e.amount) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-inbox"></i><p>No transactions in this period</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ============ BUDGET REPORT ============ -->
+{% elif report_type == 'budget' %}
+<div class="stat-grid">
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
+        <p class="stat-label">Total Budget</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_budget) }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-calendar3"></i> {{ month_name }} {{ selected_year }}</p>
+    </div>
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-arrow-up-circle"></i></div>
+        <p class="stat-label">Total Spent</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_spent) }}</p>
+        <p class="stat-change negative"><i class="bi bi-receipt"></i> Actual spending</p>
+    </div>
+    <div class="stat-card {% if data.total_remaining >= 0 %}savings{% else %}expense{% endif %}">
+        <div class="stat-icon"><i class="bi bi-piggy-bank"></i></div>
+        <p class="stat-label">Remaining</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_remaining) }}</p>
+        <p class="stat-change {% if data.total_remaining >= 0 %}positive{% else %}negative{% endif %}"><i class="bi bi-arrow-{% if data.total_remaining >= 0 %}up{% else %}down{% endif %}"></i> {% if data.total_remaining >= 0 %}Available{% else %}Over budget{% endif %}</p>
+    </div>
+    <div class="stat-card {% if data.utilization >= 100 %}expense{% elif data.utilization >= 80 %}budget{% else %}income{% endif %}">
+        <div class="stat-icon"><i class="bi bi-percent"></i></div>
+        <p class="stat-label">Utilization</p>
+        <p class="stat-value">{{ "%.1f"|format(data.utilization) }}%</p>
+        <p class="stat-change {% if data.utilization >= 100 %}negative{% elif data.utilization >= 80 %}text-warning{% else %}positive{% endif %}"><i class="bi bi-bar-chart"></i> Budget used</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-table"></i> Budget vs Spending</h2>
+        <span class="badge badge-secondary">{{ data.budget_report|length if data.budget_report else 0 }} categories</span>
+    </div>
+    {% if data.budget_report %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>Category</th><th class="text-right">Budget</th><th class="text-right">Spent</th><th class="text-right">Remaining</th><th>Used %</th><th class="text-center">Status</th></tr>
+            </thead>
+            <tbody>
+                {% for b in data.budget_report %}
+                <tr>
+                    <td class="font-semibold">{{ b.category }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(b.budget) }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(b.spent) }}</td>
+                    <td class="text-right {% if b.remaining < 0 %}text-danger font-bold{% endif %}">₹{{ "{:,.0f}".format(b.remaining) }}</td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <div class="progress progress-sm" style="flex:1; min-width:80px;">
+                                <div class="progress-bar {% if b.status == 'Exceeded' %}danger{% elif b.status == 'Warning' %}warning{% else %}success{% endif %}" style="width:{% if b.percentage > 100 %}100{% else %}{{ "%.0f"|format(b.percentage) }}{% endif %}%;"></div>
+                            </div>
+                            <span class="font-semibold" style="min-width:42px; font-size:12px;{% if b.percentage >= 100 %}color:var(--danger);{% endif %}">{{ "%.0f"|format(b.percentage) }}%</span>
+                        </div>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge {% if b.status == 'Exceeded' %}badge-danger{% elif b.status == 'Warning' %}badge-warning{% else %}badge-success{% endif %}">
+                            {% if b.status == 'Exceeded' %}<i class="bi bi-x-circle"></i>{% elif b.status == 'Warning' %}<i class="bi bi-exclamation-triangle"></i>{% else %}<i class="bi bi-check-circle"></i>{% endif %}
+                            {{ b.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background:var(--bg); font-weight:700;">
+                    <td>TOTAL</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(data.total_budget) }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(data.total_spent) }}</td>
+                    <td class="text-right {% if data.total_remaining < 0 %}text-danger{% endif %}">₹{{ "{:,.0f}".format(data.total_remaining) }}</td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <div class="progress progress-sm" style="flex:1; min-width:80px;">
+                                <div class="progress-bar {% if data.utilization >= 100 %}danger{% elif data.utilization >= 80 %}warning{% else %}success{% endif %}" style="width:{% if data.utilization > 100 %}100{% else %}{{ "%.0f"|format(data.utilization) }}{% endif %}%;"></div>
+                            </div>
+                            <span style="min-width:42px; font-size:12px;">{{ "%.0f"|format(data.utilization) }}%</span>
+                        </div>
+                    </td>
+                    <td class="text-center"><span class="badge {% if data.utilization >= 100 %}badge-danger{% elif data.utilization >= 80 %}badge-warning{% else %}badge-success{% endif %}">{% if data.utilization >= 100 %}Exceeded{% elif data.utilization >= 80 %}Warning{% else %}Good{% endif %}</span></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="bi bi-inbox"></i><p>No budget set for {{ month_name }} {{ selected_year }}</p></div>
+    {% endif %}
+</div>
+
+<!-- ============ INVESTMENT REPORT ============ -->
+{% elif report_type == 'investment' %}
+<div class="stat-grid">
+    <div class="stat-card investment">
+        <div class="stat-icon"><i class="bi bi-graph-up"></i></div>
+        <p class="stat-label">Total Invested</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_invested) }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-cash"></i> Capital invested</p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-cash-coin"></i></div>
+        <p class="stat-label">Current Value</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_current) }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-wallet"></i> Portfolio value</p>
+    </div>
+    <div class="stat-card {% if data.total_pl >= 0 %}income{% else %}expense{% endif %}">
+        <div class="stat-icon"><i class="bi bi-arrow-{% if data.total_pl >= 0 %}up{% else %}down{% endif %}-circle"></i></div>
+        <p class="stat-label">Profit / Loss</p>
+        <p class="stat-value">{{ "+" if data.total_pl >= 0 }}₹{{ "{:,.0f}".format(data.total_pl) }}</p>
+        <p class="stat-change {% if data.total_pl >= 0 %}positive{% else %}negative{% endif %}"><i class="bi bi-arrow-{% if data.total_pl >= 0 %}up{% else %}down{% endif %}"></i> Net {% if data.total_pl >= 0 %}gain{% else %}loss{% endif %}</p>
+    </div>
+    <div class="stat-card {% if data.total_roi >= 0 %}income{% else %}expense{% endif %}">
+        <div class="stat-icon"><i class="bi bi-percent"></i></div>
+        <p class="stat-label">Overall ROI</p>
+        <p class="stat-value">{{ "+" if data.total_roi >= 0 }}{{ "%.1f"|format(data.total_roi) }}%</p>
+        <p class="stat-change {% if data.total_roi >= 0 %}positive{% else %}negative{% endif %}"><i class="bi bi-trending-{% if data.total_roi >= 0 %}up{% else %}down{% endif %}"></i> Return on investment</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-table"></i> Investment Performance</h2>
+        <span class="badge badge-secondary">{{ data.investments|length if data.investments else 0 }} investments</span>
+    </div>
+    {% if data.investments %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>Investment</th><th>Asset Type</th><th class="text-right">Invested</th><th class="text-right">Current</th><th class="text-right">P/L</th><th class="text-right">ROI</th><th class="text-center">Status</th></tr>
+            </thead>
+            <tbody>
+                {% for inv in data.investments %}
+                <tr>
+                    <td class="font-semibold">{{ inv.name }}</td>
+                    <td><span class="badge badge-info">{{ inv.asset }}</span></td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(inv.invested) }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(inv.current) }}</td>
+                    <td class="text-right font-bold {% if inv.pl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "+" if inv.pl >= 0 }}₹{{ "{:,.0f}".format(inv.pl) }}</td>
+                    <td class="text-right font-bold {% if inv.roi >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "+" if inv.roi >= 0 }}{{ "%.1f"|format(inv.roi) }}%</td>
+                    <td class="text-center"><span class="badge {% if inv.status == 'Profit' %}badge-success{% else %}badge-danger{% endif %}">{% if inv.status == 'Profit' %}<i class="bi bi-arrow-up"></i>{% else %}<i class="bi bi-arrow-down"></i>{% endif %} {{ inv.status }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background:var(--bg); font-weight:700;">
+                    <td colspan="2">TOTAL</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(data.total_invested) }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(data.total_current) }}</td>
+                    <td class="text-right {% if data.total_pl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "+" if data.total_pl >= 0 }}₹{{ "{:,.0f}".format(data.total_pl) }}</td>
+                    <td class="text-right {% if data.total_roi >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "+" if data.total_roi >= 0 }}{{ "%.1f"|format(data.total_roi) }}%</td>
+                    <td class="text-center"><span class="badge {% if data.total_pl >= 0 %}badge-success{% else %}badge-danger{% endif %}">{% if data.total_pl >= 0 %}Profit{% else %}Loss{% endif %}</span></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="bi bi-inbox"></i><p>No investments yet. Add investments to see the report.</p></div>
+    {% endif %}
+</div>
+
+<!-- ============ GOAL REPORT ============ -->
+{% elif report_type == 'goal' %}
+<div class="stat-grid">
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-bullseye"></i></div>
+        <p class="stat-label">Total Goals</p>
+        <p class="stat-value">{{ data.total_goals }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-list"></i> All goals</p>
+    </div>
+    <div class="stat-card income">
+        <div class="stat-icon"><i class="bi bi-trophy"></i></div>
+        <p class="stat-label">Achieved</p>
+        <p class="stat-value">{{ data.achieved }}</p>
+        <p class="stat-change positive"><i class="bi bi-check-circle"></i> Completed</p>
+    </div>
+    <div class="stat-card investment">
+        <div class="stat-icon"><i class="bi bi-flag"></i></div>
+        <p class="stat-label">Total Target</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_target) }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-cash"></i> Combined target</p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-percent"></i></div>
+        <p class="stat-label">Completion</p>
+        <p class="stat-value">{{ "%.1f"|format(data.completion) }}%</p>
+        <p class="stat-change positive"><i class="bi bi-graph-up-arrow"></i> Overall progress</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-table"></i> Goal Progress</h2>
+        <span class="badge badge-secondary">{{ data.goals|length if data.goals else 0 }} goals</span>
+    </div>
+    {% if data.goals %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>Goal</th><th>Category</th><th class="text-right">Target</th><th class="text-right">Saved</th><th class="text-right">Remaining</th><th>Progress</th><th>Target Date</th><th class="text-center">Days Left</th><th class="text-center">Status</th></tr>
+            </thead>
+            <tbody>
+                {% for g in data.goals %}
+                <tr>
+                    <td class="font-semibold">{{ g.name }}</td>
+                    <td><span class="badge badge-secondary">{{ g.category }}</span></td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(g.target) }}</td>
+                    <td class="text-right font-bold text-success">₹{{ "{:,.0f}".format(g.saved) }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(g.remaining) }}</td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <div class="progress progress-sm" style="flex:1; min-width:80px;">
+                                <div class="progress-bar {% if g.percentage >= 100 %}success{% elif g.percentage >= 75 %}{% elif g.percentage >= 40 %}warning{% else %}danger{% endif %}" style="width:{% if g.percentage > 100 %}100{% else %}{{ "%.0f"|format(g.percentage) }}{% endif %}%;"></div>
+                            </div>
+                            <span class="font-semibold" style="min-width:42px; font-size:12px;">{{ "%.0f"|format(g.percentage) }}%</span>
+                        </div>
+                    </td>
+                    <td style="font-size:12px; white-space:nowrap;">{{ g.target_date or '-' }}</td>
+                    <td class="text-center">
+                        {% if g.days_left is not none %}
+                            <span class="{% if g.days_left < 0 %}text-danger font-bold{% elif g.days_left <= 30 %}text-warning font-bold{% endif %}">{{ g.days_left }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if g.achieved %}
+                            <span class="badge badge-success"><i class="bi bi-trophy"></i> Achieved</span>
+                        {% elif g.days_left is not none and g.days_left < 0 %}
+                            <span class="badge badge-danger"><i class="bi bi-x-circle"></i> Overdue</span>
+                        {% elif g.days_left is not none and g.days_left <= 30 %}
+                            <span class="badge badge-warning"><i class="bi bi-clock"></i> Due Soon</span>
+                        {% else %}
+                            <span class="badge badge-info"><i class="bi bi-hourglass"></i> In Progress</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background:var(--bg); font-weight:700;">
+                    <td colspan="2">TOTAL</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(data.total_target) }}</td>
+                    <td class="text-right text-success">₹{{ "{:,.0f}".format(data.total_saved) }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(data.total_remaining) }}</td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <div class="progress progress-sm" style="flex:1; min-width:80px;">
+                                <div class="progress-bar" style="width:{{ "%.0f"|format(data.completion) }}%;"></div>
+                            </div>
+                            <span style="min-width:42px; font-size:12px;">{{ "%.0f"|format(data.completion) }}%</span>
+                        </div>
+                    </td>
+                    <td colspan="3" class="text-center"><span class="badge badge-primary">{{ data.achieved }} / {{ data.total_goals }} achieved</span></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="bi bi-inbox"></i><p>No goals set yet</p></div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

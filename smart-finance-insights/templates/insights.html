@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+{% block title %}AI Financial Insights - Smart Finance Insights{% endblock %}
+{% block content %}
+{% set hero = data.insights[0] if data.insights else none %}
+{% set savings_positive = data.savings_rate >= 20 %}
+{% set expense_high = data.expense_rate > 80 %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">AI Financial Insights</h1>
+        <p class="page-subtitle">Personalized recommendations based on your spending behavior</p>
+    </div>
+    <div class="flex items-center gap-2" style="flex-wrap:wrap;">
+        <a href="{{ url_for('intelligence.analysis') }}" class="btn btn-outline"><i class="bi bi-bar-chart-line"></i> Analysis</a>
+        <a href="{{ url_for('intelligence.budget_recommendations') }}" class="btn btn-primary"><i class="bi bi-lightbulb"></i> Budget Recs</a>
+        <a href="{{ url_for('intelligence.health_score') }}" class="btn btn-outline"><i class="bi bi-heart-pulse"></i> Health Score</a>
+    </div>
+</div>
+
+<!-- Hero Callout -->
+{% if hero %}
+<div class="card mb-4" style="background:linear-gradient(135deg, var(--primary-bg) 0%, #dcfce7 100%); border:1px solid var(--primary-lighter);">
+    <div class="flex items-center gap-4" style="flex-wrap:wrap;">
+        <div class="insight-icon {{ hero.type }}" style="width:56px; height:56px; font-size:24px; background:white;">
+            <i class="bi bi-{{ hero.icon }}"></i>
+        </div>
+        <div style="flex:1; min-width:200px;">
+            <div class="flex items-center gap-2 mb-1" style="flex-wrap:wrap;">
+                <span class="badge badge-primary"><i class="bi bi-stars"></i> Top Insight</span>
+                <span class="badge badge-secondary">{{ hero.category }}</span>
+            </div>
+            <h2 style="font-size:18px; font-weight:800; margin-bottom:4px;">{{ hero.title }}</h2>
+            <p style="font-size:14px; color:var(--text-secondary);">{{ hero.message }}</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card income">
+        <div class="stat-icon"><i class="bi bi-arrow-down-circle"></i></div>
+        <p class="stat-label">Income</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_income) }}</p>
+        <p class="stat-change positive"><i class="bi bi-calendar-month"></i> This month</p>
+    </div>
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-arrow-up-circle"></i></div>
+        <p class="stat-label">Expenses</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_expense) }}</p>
+        <p class="stat-change {% if expense_high %}negative{% else %}positive{% endif %}">
+            <i class="bi bi-percent"></i> {{ "%.1f"|format(data.expense_rate) }}% of income
+        </p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-piggy-bank"></i></div>
+        <p class="stat-label">Savings</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.savings) }}</p>
+        <p class="stat-change {% if savings_positive %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-arrow-{% if savings_positive %}up{% else %}down{% endif %}"></i>
+            Net saved
+        </p>
+    </div>
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-percent"></i></div>
+        <p class="stat-label">Savings Rate</p>
+        <p class="stat-value">{{ "%.1f"|format(data.savings_rate) }}%</p>
+        <p class="stat-change {% if savings_positive %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-bullseye"></i> Target 20%+
+        </p>
+    </div>
+</div>
+
+<!-- AI Insights + Financial Ratios -->
+<div class="grid grid-2 mb-4">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-stars"></i> AI Insights</h2>
+            <span class="badge badge-primary">{{ data.insights|length }} insights</span>
+        </div>
+        {% if data.insights %}
+            {% for insight in data.insights %}
+            <div class="insight-card">
+                <div class="insight-icon {{ insight.type }}"><i class="bi bi-{{ insight.icon }}"></i></div>
+                <div style="flex:1;">
+                    <div class="flex items-center justify-between mb-1" style="flex-wrap:wrap; gap:6px;">
+                        <p class="insight-title">{{ insight.title }}</p>
+                        <span class="badge badge-secondary">{{ insight.category }}</span>
+                    </div>
+                    <p class="insight-message">{{ insight.message }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="bi bi-inbox"></i>
+                <p>No insights available yet. Add some transactions to generate AI insights.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-pie-chart"></i> Financial Ratios</h2>
+            <span class="badge badge-secondary">This month</span>
+        </div>
+
+        <!-- Savings Rate -->
+        <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="flex items-center gap-2">
+                    <i class="bi bi-piggy-bank text-success"></i>
+                    <strong>Savings Rate</strong>
+                </span>
+                <span class="font-bold text-{% if data.savings_rate >= 30 %}success{% elif data.savings_rate >= 20 %}primary{% elif data.savings_rate >= 10 %}warning{% else %}danger{% endif %}">
+                    {{ "%.1f"|format(data.savings_rate) }}%
+                </span>
+            </div>
+            <div class="progress progress-lg">
+                <div class="progress-bar {% if data.savings_rate >= 30 %}success{% elif data.savings_rate >= 20 %}{% elif data.savings_rate >= 10 %}warning{% else %}danger{% endif %}" style="width:{{ [data.savings_rate, 100] | min }}%;"></div>
+            </div>
+            <div class="flex items-center justify-between mt-1" style="font-size:12px; color:var(--text-muted);">
+                <span>Healthy: ≥30%</span>
+                <span>Target: ≥20%</span>
+            </div>
+        </div>
+
+        <!-- Expense Ratio -->
+        <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="flex items-center gap-2">
+                    <i class="bi bi-cart4 text-danger"></i>
+                    <strong>Expense Ratio</strong>
+                </span>
+                <span class="font-bold text-{% if data.expense_rate <= 60 %}success{% elif data.expense_rate <= 80 %}warning{% else %}danger{% endif %}">
+                    {{ "%.1f"|format(data.expense_rate) }}%
+                </span>
+            </div>
+            <div class="progress progress-lg">
+                <div class="progress-bar {% if data.expense_rate <= 60 %}success{% elif data.expense_rate <= 80 %}warning{% else %}danger{% endif %}" style="width:{{ [data.expense_rate, 100] | min }}%;"></div>
+            </div>
+            <div class="flex items-center justify-between mt-1" style="font-size:12px; color:var(--text-muted);">
+                <span>Healthy: ≤60%</span>
+                <span>Critical: &gt;80%</span>
+            </div>
+        </div>
+
+        <!-- Net Savings Visualization -->
+        <div style="background:var(--bg); border-radius:var(--radius); padding:14px; margin-top:8px;">
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">Income Allocation</p>
+            <div class="flex" style="height:24px; border-radius:6px; overflow:hidden; gap:2px;">
+                <div style="flex:{{ data.savings }}; background:var(--primary); display:flex; align-items:center; justify-content:center; color:white; font-size:11px; font-weight:700;">
+                    {% if data.savings > 0 %}Savings{% endif %}
+                </div>
+                <div style="flex:{{ data.total_expense }}; background:var(--danger); display:flex; align-items:center; justify-content:center; color:white; font-size:11px; font-weight:700;">
+                    {% if data.total_expense > 0 %}Expenses{% endif %}
+                </div>
+            </div>
+            <div class="flex items-center justify-between mt-2" style="font-size:12px;">
+                <span><i class="bi bi-circle-fill text-primary"></i> ₹{{ "{:,.0f}".format(data.savings) }}</span>
+                <span><i class="bi bi-circle-fill text-danger"></i> ₹{{ "{:,.0f}".format(data.total_expense) }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions / Related Intelligence -->
+<div class="grid grid-3">
+    <a href="{{ url_for('intelligence.analysis') }}" class="card" style="text-decoration:none; color:inherit; transition:all 0.2s;">
+        <div class="flex items-center gap-3">
+            <div class="insight-icon info"><i class="bi bi-bar-chart-line"></i></div>
+            <div>
+                <p class="font-bold">Spending Analysis</p>
+                <p style="font-size:12px; color:var(--text-muted);">Category-wise breakdown</p>
+            </div>
+        </div>
+    </a>
+    <a href="{{ url_for('intelligence.budget_recommendations') }}" class="card" style="text-decoration:none; color:inherit; transition:all 0.2s;">
+        <div class="flex items-center gap-3">
+            <div class="insight-icon warning"><i class="bi bi-lightbulb"></i></div>
+            <div>
+                <p class="font-bold">Budget Recs</p>
+                <p style="font-size:12px; color:var(--text-muted);">AI-powered suggestions</p>
+            </div>
+        </div>
+    </a>
+    <a href="{{ url_for('intelligence.health_score') }}" class="card" style="text-decoration:none; color:inherit; transition:all 0.2s;">
+        <div class="flex items-center gap-3">
+            <div class="insight-icon success"><i class="bi bi-heart-pulse"></i></div>
+            <div>
+                <p class="font-bold">Health Score</p>
+                <p style="font-size:12px; color:var(--text-muted);">Overall financial fitness</p>
+            </div>
+        </div>
+    </a>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Insights page is primarily text-driven; reserve block for future ratio charts.
+    console.log('AI Insights loaded with {{ data.insights|length }} insights.');
+});
+</script>
+{% endblock %}

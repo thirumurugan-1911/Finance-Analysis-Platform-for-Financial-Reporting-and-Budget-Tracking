@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard - Smart Finance Insights{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">{{ month_name }} {{ year }} - Financial Overview</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <a href="{{ url_for('jarvis.index') }}" class="btn btn-primary"><i class="bi bi-robot"></i> Ask JARVIS</a>
+        <a href="{{ url_for('expenses.index') }}" class="btn btn-outline"><i class="bi bi-plus-lg"></i> Add Transaction</a>
+    </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card income">
+        <div class="stat-icon"><i class="bi bi-arrow-down-circle"></i></div>
+        <p class="stat-label">Total Income</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_income) }}</p>
+        <p class="stat-change positive"><i class="bi bi-arrow-up"></i> {{ month_name }} income</p>
+    </div>
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-arrow-up-circle"></i></div>
+        <p class="stat-label">Total Expenses</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_expense) }}</p>
+        <p class="stat-change {% if total_expense > total_income %}negative{% else %}positive{% endif %}">
+            <i class="bi bi-pie-chart"></i> {{ "%.0f"|format(calculate_percentage(total_expense, total_income)) if total_income else 0 }}% of income
+        </p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-piggy-bank"></i></div>
+        <p class="stat-label">Savings</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(savings) }}</p>
+        <p class="stat-change {% if savings_rate >= 20 %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-percent"></i> {{ "%.1f"|format(savings_rate) }}% savings rate
+        </p>
+    </div>
+    <div class="stat-card investment">
+        <div class="stat-icon"><i class="bi bi-graph-up"></i></div>
+        <p class="stat-label">Investment Value</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_current) }}</p>
+        <p class="stat-change {% if investment_pl >= 0 %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-arrow-{% if investment_pl >= 0 %}up{% else %}down{% endif %}"></i>
+            ₹{{ "{:,.0f}".format(investment_pl) }} {% if investment_pl >= 0 %}profit{% else %}loss{% endif %}
+        </p>
+    </div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="grid grid-2 mb-4">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-bar-chart"></i> Income vs Expense</h2>
+            <span class="badge badge-secondary">Last 6 months</span>
+        </div>
+        <div class="chart-container">
+            <canvas id="incomeExpenseChart"></canvas>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-pie-chart"></i> Expense Breakdown</h2>
+            <span class="badge badge-secondary">{{ month_name }}</span>
+        </div>
+        <div class="chart-container">
+            <canvas id="expensePieChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Status + Financial Health -->
+<div class="grid grid-3 mb-4">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-wallet2"></i> Budget Status</h2>
+        </div>
+        <div style="text-align:center; padding:10px 0;">
+            <p style="font-size:28px; font-weight:800; color:var(--primary);">{{ "%.0f"|format(budget_used_pct) }}%</p>
+            <p style="font-size:13px; color:var(--text-muted);">Budget Utilized</p>
+        </div>
+        <div class="progress progress-lg mb-3">
+            <div class="progress-bar {% if budget_used_pct >= 100 %}danger{% elif budget_used_pct >= 80 %}warning{% endif %}" style="width:{{ min(budget_used_pct, 100) }}%;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px;">
+            <span>Spent: <strong>₹{{ "{:,.0f}".format(total_expense) }}</strong></span>
+            <span>Budget: <strong>₹{{ "{:,.0f}".format(total_budget) }}</strong></span>
+        </div>
+        <a href="{{ url_for('budget.index') }}" class="btn btn-outline btn-sm" style="width:100%; justify-content:center; margin-top:12px;">
+            View Budget Details
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-heart-pulse"></i> Financial Health</h2>
+        </div>
+        <div style="text-align:center; padding:10px 0;">
+            <p style="font-size:40px; font-weight:800; color:var(--primary);">{{ health_score.score }}<span style="font-size:18px; color:var(--text-muted);">/100</span></p>
+            <span class="badge badge-{{ health_score.status_color }}">{{ health_score.status }}</span>
+        </div>
+        <div class="progress progress-lg mb-3">
+            <div class="progress-bar {% if health_score.score >= 80 %}success{% elif health_score.score >= 60 %}{% elif health_score.score >= 40 %}warning{% else %}danger{% endif %}" style="width:{{ health_score.score }}%;"></div>
+        </div>
+        <p style="font-size:12px; color:var(--text-muted); text-align:center;">Savings {{ "%.0f"|format(health_score.indicators.savings_ratio) }}% • Expense {{ "%.0f"|format(health_score.indicators.expense_ratio) }}%</p>
+        <a href="{{ url_for('intelligence.health_score') }}" class="btn btn-outline btn-sm" style="width:100%; justify-content:center; margin-top:12px;">
+            View Details
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-bell"></i> Recent Alerts</h2>
+            <a href="{{ url_for('notifications.index') }}" style="font-size:12px; color:var(--primary);">View All</a>
+        </div>
+        {% if notifications %}
+            {% for n in notifications[:4] %}
+            <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-light);">
+                <i class="bi bi-{% if 'Budget' in n.type %}exclamation-triangle{% elif 'Bill' in n.type %}calendar{% elif 'Goal' in n.type %}bullseye{% elif 'Investment' in n.type %}graph-up{% else %}info-circle{% endif %}" style="color:{% if n.priority == 'High' %}var(--danger){% elif n.priority == 'Medium' %}var(--warning){% else %}var(--success){% endif %}; font-size:16px;"></i>
+                <div style="flex:1; min-width:0;">
+                    <p style="font-size:12px; font-weight:600; margin-bottom:2px;">{{ n.type }}</p>
+                    <p style="font-size:12px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ n.message }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state" style="padding:20px;"><i class="bi bi-check-circle"></i><p>No active notifications</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- AI Insights + Spending Analysis -->
+<div class="grid grid-2 mb-4">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-stars"></i> AI Financial Insights</h2>
+            <a href="{{ url_for('intelligence.insights') }}" style="font-size:12px; color:var(--primary);">View All</a>
+        </div>
+        {% for insight in ai_insights.insights[:4] %}
+        <div class="insight-card">
+            <div class="insight-icon {{ insight.type }}"><i class="bi bi-{{ insight.icon }}"></i></div>
+            <div>
+                <p class="insight-title">{{ insight.title }}</p>
+                <p class="insight-message">{{ insight.message }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-bar-chart-line"></i> Spending Analysis</h2>
+            <a href="{{ url_for('intelligence.analysis') }}" style="font-size:12px; color:var(--primary);">Details</a>
+        </div>
+        <div style="margin-bottom:16px;">
+            <p style="font-size:13px; color:var(--text-muted);">Total spent in {{ month_name }}</p>
+            <p style="font-size:24px; font-weight:800;">₹{{ "{:,.0f}".format(spending_analysis.total_expense) }}</p>
+            <p style="font-size:12px; color:var(--text-muted);">{{ spending_analysis.transaction_count }} transactions • Avg ₹{{ "{:,.0f}".format(spending_analysis.avg_daily) }}/day</p>
+        </div>
+        {% for cat in spending_analysis.categories[:5] %}
+        <div style="margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+                <span>{{ cat.category }}</span>
+                <span><strong>₹{{ "{:,.0f}".format(cat.amount) }}</strong> ({{ "%.0f"|format(cat.percentage) }}%)</span>
+            </div>
+            <div class="progress progress-sm">
+                <div class="progress-bar" style="width:{{ cat.percentage }}%; background:var(--primary);"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Recent Transactions + Goal Progress -->
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-clock-history"></i> Recent Transactions</h2>
+            <a href="{{ url_for('expenses.index') }}" style="font-size:12px; color:var(--primary);">View All</a>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right;">Amount</th></tr>
+                </thead>
+                <tbody>
+                    {% for t in recent_transactions %}
+                    <tr>
+                        <td style="font-size:12px;">{{ t.date }}</td>
+                        <td>{{ t.desc }}</td>
+                        <td><span class="badge {% if t.type == 'Income' %}badge-success{% else %}badge-secondary{% endif %}">{{ t.category }}</span></td>
+                        <td style="text-align:right; font-weight:600; color:{% if t.type == 'Income' %}var(--success){% else %}var(--danger){% endif %};">
+                            {% if t.type == 'Income' %}+{% else %}-{% endif %}₹{{ "{:,.0f}".format(t.amount) }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No transactions yet</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-bullseye"></i> Goal Progress</h2>
+            <a href="{{ url_for('goals.index') }}" style="font-size:12px; color:var(--primary);">View All</a>
+        </div>
+        {% for g in goal_progress %}
+        <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <span style="font-weight:600; font-size:14px;">{{ g.name }}</span>
+                <span style="font-size:13px; color:var(--text-muted);">{{ "%.0f"|format(g.percentage) }}%</span>
+            </div>
+            <div class="progress mb-1">
+                <div class="progress-bar {% if g.percentage >= 100 %}success{% endif %}" style="width:{{ g.percentage }}%;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
+                <span>₹{{ "{:,.0f}".format(g.saved) }} saved</span>
+                <span>of ₹{{ "{:,.0f}".format(g.target) }}</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-bullseye"></i><p>No goals set yet</p></div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Income vs Expense Chart
+    const ieData = {{ income_expense_data | tojson }};
+    createChart('incomeExpenseChart', {
+        type: 'bar',
+        data: {
+            labels: ieData.map(d => d.month),
+            datasets: [
+                { label: 'Income', data: ieData.map(d => d.income), backgroundColor: '#16a34a', borderRadius: 6 },
+                { label: 'Expense', data: ieData.map(d => d.expense), backgroundColor: '#ef4444', borderRadius: 6 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15 } } },
+            scales: { y: { beginAtZero: true, ticks: { callback: v => '₹' + (v/1000) + 'k' } } }
+        }
+    });
+
+    // Expense Pie Chart
+    const catData = {{ category_expenses | tojson }};
+    const colors = ['#16a34a', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'];
+    createChart('expensePieChart', {
+        type: 'doughnut',
+        data: {
+            labels: catData.map(c => c.category),
+            datasets: [{ data: catData.map(c => c.amount), backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '60%',
+            plugins: {
+                legend: { position: 'right', labels: { usePointStyle: true, padding: 10, font: { size: 12 } } },
+                tooltip: { callbacks: { label: ctx => ctx.label + ': ₹' + ctx.parsed.toLocaleString('en-IN') } }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

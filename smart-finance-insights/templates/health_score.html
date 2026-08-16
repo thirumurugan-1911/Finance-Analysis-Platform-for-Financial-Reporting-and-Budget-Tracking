@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+{% block title %}Financial Health Score - Smart Finance Insights{% endblock %}
+{% block content %}
+{% set ind = data.indicators %}
+{% set sb = data.score_breakdown %}
+{% set fin = data.financial_data %}
+
+{% set savings_class = 'success' if ind.savings_ratio >= 30 else ('warning' if ind.savings_ratio >= 20 else 'danger') %}
+{% set expense_class = 'success' if ind.expense_ratio <= 60 else ('warning' if ind.expense_ratio <= 80 else 'danger') %}
+{% set inv_growth_class = 'success' if ind.investment_growth >= 0 else 'danger' %}
+{% set dti_class = 'success' if ind.debt_to_income <= 20 else ('warning' if ind.debt_to_income <= 30 else 'danger') %}
+{% set inv_ratio_class = 'success' if ind.investment_ratio >= 50 else ('warning' if ind.investment_ratio >= 25 else 'danger') %}
+{% set emerg_class = 'success' if ind.emergency_months >= 6 else ('warning' if ind.emergency_months >= 3 else 'danger') %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Financial Health Score</h1>
+        <p class="page-subtitle">Comprehensive evaluation of your financial wellness</p>
+    </div>
+    <div class="flex items-center gap-2" style="flex-wrap:wrap;">
+        <a href="{{ url_for('intelligence.insights') }}" class="btn btn-outline"><i class="bi bi-stars"></i> AI Insights</a>
+        <a href="{{ url_for('intelligence.budget_recommendations') }}" class="btn btn-primary"><i class="bi bi-lightbulb"></i> Budget Recs</a>
+    </div>
+</div>
+
+<!-- HERO Section -->
+<div class="card mb-4" style="background:linear-gradient(135deg, var(--primary-bg) 0%, #dcfce7 100%); border:1px solid var(--primary-lighter);">
+    <div style="text-align:center; padding:20px 0;">
+        <div style="display:inline-flex; align-items:center; justify-content:center; position:relative; width:220px; height:220px; margin-bottom:8px;">
+            <canvas id="scoreGauge" width="220" height="220"></canvas>
+            <div style="position:absolute; text-align:center;">
+                <p style="font-size:64px; font-weight:800; line-height:1; color:var(--text);">{{ data.score }}</p>
+                <p style="font-size:14px; color:var(--text-muted); margin-top:-4px;">out of 100</p>
+            </div>
+        </div>
+        <div class="flex items-center justify-center gap-2 mb-3" style="flex-wrap:wrap;">
+            <span class="badge badge-{{ data.status_color }}" style="font-size:14px; padding:6px 16px;">
+                <i class="bi bi-{% if data.status == 'Excellent' %}trophy{% elif data.status == 'Good' %}check-circle{% elif data.status == 'Fair' %}exclamation-triangle{% else %}alert-circle{% endif %}"></i>
+                {{ data.status }}
+            </span>
+        </div>
+        <p style="font-size:13px; color:var(--text-secondary); max-width:480px; margin:0 auto;">
+            {% if data.status == 'Excellent' %}Outstanding financial health! You're a role model for smart money management.
+            {% elif data.status == 'Good' %}Solid financial footing with room for improvement in a few areas.
+            {% elif data.status == 'Fair' %}Your finances need attention - focus on the recommendations below.
+            {% else %}Critical: Take immediate action to improve your financial stability.
+            {% endif %}
+        </p>
+    </div>
+    <div class="progress progress-lg" style="background:white;">
+        <div class="progress-bar {% if data.status_color == 'success' %}success{% elif data.status_color == 'info' %}{% elif data.status_color == 'warning' %}warning{% else %}danger{% endif %}"
+             style="width:{{ data.score }}%;"></div>
+    </div>
+    <div class="flex items-center justify-between mt-2" style="font-size:12px; color:var(--text-muted);">
+        <span>0 · Poor</span>
+        <span>40 · Fair</span>
+        <span>60 · Good</span>
+        <span>80 · Excellent</span>
+    </div>
+</div>
+
+<!-- Indicator Cards (Top Row) -->
+<div class="grid grid-3 mb-4">
+    <!-- Savings Ratio -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-2">
+            <div class="insight-icon {{ savings_class }}"><i class="bi bi-piggy-bank"></i></div>
+            <span class="badge badge-{{ savings_class }}">{{ 'Healthy' if ind.savings_ratio >= 30 else ('OK' if ind.savings_ratio >= 20 else 'Low') }}</span>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted);">Savings Ratio</p>
+        <p class="font-bold text-{{ savings_class }}" style="font-size:26px;">{{ "%.1f"|format(ind.savings_ratio) }}%</p>
+        <div class="progress progress-sm mt-2">
+            <div class="progress-bar {{ savings_class }}" style="width:{{ [ind.savings_ratio, 100] | min }}%;"></div>
+        </div>
+        <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">Target: ≥30% of income</p>
+    </div>
+
+    <!-- Expense Ratio -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-2">
+            <div class="insight-icon {{ expense_class }}"><i class="bi bi-cart4"></i></div>
+            <span class="badge badge-{{ expense_class }}">{{ 'Healthy' if ind.expense_ratio <= 60 else ('OK' if ind.expense_ratio <= 80 else 'High') }}</span>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted);">Expense Ratio</p>
+        <p class="font-bold text-{{ expense_class }}" style="font-size:26px;">{{ "%.1f"|format(ind.expense_ratio) }}%</p>
+        <div class="progress progress-sm mt-2">
+            <div class="progress-bar {{ expense_class }}" style="width:{{ [ind.expense_ratio, 100] | min }}%;"></div>
+        </div>
+        <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">Target: ≤60% of income</p>
+    </div>
+
+    <!-- Investment Growth -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-2">
+            <div class="insight-icon {{ inv_growth_class }}"><i class="bi bi-graph-up-arrow"></i></div>
+            <span class="badge badge-{{ inv_growth_class }}">{{ 'Profit' if ind.investment_growth >= 0 else 'Loss' }}</span>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted);">Investment Growth</p>
+        <p class="font-bold text-{{ inv_growth_class }}" style="font-size:26px;">{{ "%.1f"|format(ind.investment_growth) }}%</p>
+        <div class="progress progress-sm mt-2">
+            <div class="progress-bar {{ inv_growth_class }}" style="width:{{ [[ind.investment_growth, 0] | max, 100] | min }}%;"></div>
+        </div>
+        <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">Portfolio ROI</p>
+    </div>
+</div>
+
+<!-- Indicator Cards (Bottom Row) -->
+<div class="grid grid-3 mb-4">
+    <!-- Debt-to-Income -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-2">
+            <div class="insight-icon {{ dti_class }}"><i class="bi bi-credit-card"></i></div>
+            <span class="badge badge-{{ dti_class }}">{{ 'Healthy' if ind.debt_to_income <= 20 else ('OK' if ind.debt_to_income <= 30 else 'High') }}</span>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted);">Debt-to-Income</p>
+        <p class="font-bold text-{{ dti_class }}" style="font-size:26px;">{{ "%.1f"|format(ind.debt_to_income) }}%</p>
+        <div class="progress progress-sm mt-2">
+            <div class="progress-bar {{ dti_class }}" style="width:{{ [ind.debt_to_income, 100] | min }}%;"></div>
+        </div>
+        <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">Target: ≤20% (annual)</p>
+    </div>
+
+    <!-- Investment Ratio -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-2">
+            <div class="insight-icon {{ inv_ratio_class }}"><i class="bi bi-graph-up"></i></div>
+            <span class="badge badge-{{ inv_ratio_class }}">{{ 'Healthy' if ind.investment_ratio >= 50 else ('OK' if ind.investment_ratio >= 25 else 'Low') }}</span>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted);">Investment Ratio</p>
+        <p class="font-bold text-{{ inv_ratio_class }}" style="font-size:26px;">{{ "%.1f"|format(ind.investment_ratio) }}%</p>
+        <div class="progress progress-sm mt-2">
+            <div class="progress-bar {{ inv_ratio_class }}" style="width:{{ [ind.investment_ratio, 100] | min }}%;"></div>
+        </div>
+        <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">Target: ≥50% of annual income</p>
+    </div>
+
+    <!-- Emergency Fund -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-2">
+            <div class="insight-icon {{ emerg_class }}"><i class="bi bi-shield-check"></i></div>
+            <span class="badge badge-{{ emerg_class }}">{{ 'Healthy' if ind.emergency_months >= 6 else ('OK' if ind.emergency_months >= 3 else 'Low') }}</span>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted);">Emergency Fund</p>
+        <p class="font-bold text-{{ emerg_class }}" style="font-size:26px;">{{ "%.1f"|format(ind.emergency_months) }} <span style="font-size:14px; color:var(--text-muted);">months</span></p>
+        <div class="progress progress-sm mt-2">
+            <div class="progress-bar {{ emerg_class }}" style="width:{{ [(ind.emergency_months / 6) * 100, 100] | min }}%;"></div>
+        </div>
+        <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">Target: ≥6 months of expenses</p>
+    </div>
+</div>
+
+<!-- Score Breakdown + Financial Summary -->
+<div class="grid grid-2 mb-4">
+    <!-- Score Breakdown -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-list-ol"></i> Score Breakdown</h2>
+            <span class="badge badge-primary">{{ data.score }}/100 total</span>
+        </div>
+
+        {% set components = [
+            ('Savings', sb.savings, 30, 'piggy-bank'),
+            ('Investment', sb.investment, 25, 'graph-up'),
+            ('Debt Management', sb.debt, 20, 'credit-card'),
+            ('Expense Control', sb.expense, 15, 'cart4'),
+            ('Emergency Fund', sb.emergency, 10, 'shield-check')
+        ] %}
+        {% for name, score, max_score, icon in components %}
+        <div class="mb-3">
+            <div class="flex items-center justify-between mb-1">
+                <span class="flex items-center gap-2">
+                    <i class="bi bi-{{ icon }} text-primary"></i>
+                    <strong style="font-size:13px;">{{ name }}</strong>
+                </span>
+                <span class="font-bold" style="font-size:13px;">
+                    <span class="{% if score >= max_score %}text-success{% elif score >= max_score/2 %}text-warning{% else %}text-danger{% endif %}">{{ score }}</span>
+                    <span class="text-muted">/ {{ max_score }}</span>
+                </span>
+            </div>
+            <div class="progress">
+                <div class="progress-bar {% if score >= max_score %}success{% elif score >= max_score/2 %}warning{% else %}danger{% endif %}"
+                     style="width:{{ (score / max_score * 100) }}%;"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-wallet2"></i> Financial Summary</h2>
+            <span class="badge badge-secondary">Current month</span>
+        </div>
+        <div class="table-container">
+            <table>
+                <tbody>
+                    <tr>
+                        <td><span class="flex items-center gap-2"><i class="bi bi-arrow-down-circle text-success"></i> Monthly Income</span></td>
+                        <td class="text-right font-bold text-success">₹{{ "{:,.0f}".format(fin.monthly_income) }}</td>
+                    </tr>
+                    <tr>
+                        <td><span class="flex items-center gap-2"><i class="bi bi-arrow-up-circle text-danger"></i> Monthly Expenses</span></td>
+                        <td class="text-right font-bold text-danger">₹{{ "{:,.0f}".format(fin.monthly_expenses) }}</td>
+                    </tr>
+                    <tr>
+                        <td><span class="flex items-center gap-2"><i class="bi bi-piggy-bank text-primary"></i> Monthly Savings</span></td>
+                        <td class="text-right font-bold text-primary">₹{{ "{:,.0f}".format(fin.monthly_savings) }}</td>
+                    </tr>
+                    <tr>
+                        <td><span class="flex items-center gap-2"><i class="bi bi-graph-up text-info"></i> Total Investments</span></td>
+                        <td class="text-right font-bold">₹{{ "{:,.0f}".format(fin.total_investments) }}</td>
+                    </tr>
+                    <tr>
+                        <td><span class="flex items-center gap-2"><i class="bi bi-credit-card text-warning"></i> Outstanding Loan</span></td>
+                        <td class="text-right font-bold text-warning">₹{{ "{:,.0f}".format(fin.outstanding_loan) }}</td>
+                    </tr>
+                    <tr>
+                        <td><span class="flex items-center gap-2"><i class="bi bi-shield-check text-success"></i> Emergency Fund</span></td>
+                        <td class="text-right font-bold text-success">₹{{ "{:,.0f}".format(fin.emergency_fund) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- AI Recommendations -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-robot"></i> AI Recommendations</h2>
+        <span class="badge badge-primary">{{ data.recommendations|length }} tips</span>
+    </div>
+    {% if data.recommendations %}
+    <div class="grid grid-2">
+        {% for rec in data.recommendations %}
+        <div class="insight-card">
+            <div class="insight-icon {% if 'excellent' in rec or 'sufficient' in rec or 'maintain' in rec or 'Continue' in rec %}success{% elif 'urgent' in rec or 'critical' in rec %}danger{% else %}info{% endif %}">
+                <i class="bi bi-{% if 'excellent' in rec or 'sufficient' in rec or 'maintain' in rec or 'Continue' in rec %}check-circle{% elif 'urgent' in rec or 'critical' in rec %}exclamation-circle{% else %}lightbulb{% endif %}"></i>
+            </div>
+            <div style="flex:1;">
+                <p class="insight-message" style="font-size:13px; line-height:1.5;">{{ rec }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-check-circle text-success"></i>
+        <p>You're on track - no critical recommendations at this time.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Score gauge - custom circular progress
+    const score = {{ data.score }};
+    const statusColors = {
+        success: '#16a34a',
+        info: '#3b82f6',
+        warning: '#f59e0b',
+        danger: '#ef4444'
+    };
+    const color = statusColors['{{ data.status_color }}'] || '#16a34a';
+    const canvas = document.getElementById('scoreGauge');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const radius = Math.max(10, 90);
+        const lineWidth = 14;
+
+        // Background ring
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+
+        // Progress arc (270 degrees visible, starts from bottom-left)
+        const startAngle = 0.75 * Math.PI;
+        const endAngle = startAngle + (score / 100) * 1.5 * Math.PI;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, startAngle, endAngle);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Decorative end dot
+        const dotAngle = endAngle;
+        const dotX = cx + Math.cos(dotAngle) * radius;
+        const dotY = cy + Math.sin(dotAngle) * radius;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+});
+</script>
+{% endblock %}

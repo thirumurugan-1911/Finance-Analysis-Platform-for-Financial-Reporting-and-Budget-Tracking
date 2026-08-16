@@ -1,0 +1,312 @@
+{% extends 'base.html' %}
+{% block title %}Financial Goals - Smart Finance Insights{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Financial Goals</h1>
+        <p class="page-subtitle">Plan, track, and achieve your financial milestones</p>
+    </div>
+    <div class="flex gap-2">
+        <button class="btn btn-primary" data-modal-open="addGoalModal">
+            <i class="bi bi-plus-lg"></i> Add Goal
+        </button>
+    </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-bullseye"></i></div>
+        <p class="stat-label">Total Goals</p>
+        <p class="stat-value">{{ goals_count }}</p>
+        <p class="stat-change positive"><i class="bi bi-collection"></i> Active targets</p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-trophy"></i></div>
+        <p class="stat-label">Goals Achieved</p>
+        <p class="stat-value">{{ goals_achieved }}</p>
+        <p class="stat-change positive"><i class="bi bi-check-circle"></i> Completed milestones</p>
+    </div>
+    <div class="stat-card income">
+        <div class="stat-icon"><i class="bi bi-piggy-bank"></i></div>
+        <p class="stat-label">Total Saved</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_saved) }}</p>
+        <p class="stat-change positive"><i class="bi bi-wallet2"></i> of ₹{{ "{:,.0f}".format(total_target) }}</p>
+    </div>
+    <div class="stat-card investment">
+        <div class="stat-icon"><i class="bi bi-percent"></i></div>
+        <p class="stat-label">Completion</p>
+        <p class="stat-value">{{ "%.1f"|format(completion_pct) }}%</p>
+        <p class="stat-change {% if completion_pct >= 75 %}positive{% elif completion_pct >= 40 %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-graph-up"></i>
+            ₹{{ "{:,.0f}".format(total_remaining) }} to go
+        </p>
+    </div>
+</div>
+
+<!-- Overall Progress -->
+{% if goals %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-bar-chart-line"></i> Overall Goal Progress</h2>
+        <span class="badge {% if completion_pct >= 100 %}badge-success{% elif completion_pct >= 50 %}badge-primary{% else %}badge-warning{% endif %}">
+            {{ "%.1f"|format(completion_pct) }}% complete
+        </span>
+    </div>
+    <div class="progress progress-lg">
+        <div class="progress-bar {% if completion_pct >= 100 %}success{% elif completion_pct >= 50 %}{% elif completion_pct >= 25 %}warning{% else %}danger{% endif %}"
+             style="width:{{ [completion_pct, 100]|min }}%;"></div>
+    </div>
+    <div class="flex justify-between mt-2" style="font-size:13px;">
+        <span class="text-muted">Saved: <strong class="text-success">₹{{ "{:,.0f}".format(total_saved) }}</strong></span>
+        <span class="text-muted">Target: <strong class="text-primary">₹{{ "{:,.0f}".format(total_target) }}</strong></span>
+        <span class="text-muted">Remaining: <strong>₹{{ "{:,.0f}".format(total_remaining) }}</strong></span>
+    </div>
+</div>
+{% endif %}
+
+<!-- Goals Grid -->
+{% if goals %}
+<div class="grid grid-2">
+    {% for g in goals %}
+    <div class="goal-card">
+        <div class="goal-header">
+            <div>
+                <div class="flex items-center gap-2">
+                    <h3 class="goal-name">{{ g.name }}</h3>
+                    {% if g.achieved %}
+                    <span class="badge badge-success"><i class="bi bi-check-circle-fill"></i> Achieved</span>
+                    {% endif %}
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="badge badge-primary">{{ g.category }}</span>
+                    {% if g.target_date %}
+                    <span class="text-muted" style="font-size:12px;">
+                        <i class="bi bi-calendar3"></i> {{ g.target_date }}
+                    </span>
+                    {% endif %}
+                    {% if g.days_left is not none %}
+                    <span class="text-muted" style="font-size:12px;">
+                        <i class="bi bi-clock"></i>
+                        {% if g.days_left < 0 %}
+                        <span class="text-danger">{{ g.days_left|abs }} days overdue</span>
+                        {% elif g.days_left == 0 %}
+                        <span class="text-warning">Due today</span>
+                        {% else %}
+                        {{ g.days_left }} days left
+                        {% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="goal-progress-ring">
+                <svg width="80" height="80" viewBox="0 0 80 80">
+                    <circle cx="40" cy="40" r="34" fill="none" stroke="#f1f5f9" stroke-width="8"/>
+                    <circle cx="40" cy="40" r="34" fill="none"
+                            stroke="{% if g.percentage >= 100 %}#10b981{% elif g.percentage >= 75 %}#16a34a{% elif g.percentage >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"
+                            stroke-width="8"
+                            stroke-linecap="round"
+                            stroke-dasharray="{{ 2 * 3.14159 * 34 }}"
+                            stroke-dashoffset="{{ 2 * 3.14159 * 34 * (1 - [g.percentage, 100]|min / 100) }}"
+                            transform="rotate(-90 40 40)"/>
+                </svg>
+                <span class="goal-progress-text">{{ "%.0f"|format([g.percentage, 100]|min) }}%</span>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress mb-2">
+            <div class="progress-bar {% if g.percentage >= 100 %}success{% elif g.percentage >= 75 %}{% elif g.percentage >= 50 %}warning{% else %}danger{% endif %}"
+                 style="width:{{ [g.percentage, 100]|min }}%;"></div>
+        </div>
+
+        <!-- Amounts -->
+        <div class="flex justify-between mb-3" style="font-size:13px;">
+            <span class="text-muted">Saved: <strong class="text-success">₹{{ "{:,.0f}".format(g.saved) }}</strong></span>
+            <span class="text-muted">Target: <strong>₹{{ "{:,.0f}".format(g.target) }}</strong></span>
+            <span class="text-muted">Remaining: <strong class="text-primary">₹{{ "{:,.0f}".format(g.remaining) }}</strong></span>
+        </div>
+
+        <!-- Status + Actions -->
+        <div class="flex items-center justify-between">
+            {% if g.status == 'Achieved' %}
+            <span class="badge badge-success"><i class="bi bi-trophy"></i> Achieved</span>
+            {% elif g.status == 'On Track' %}
+            <span class="badge badge-success"><i class="bi bi-check-circle"></i> On Track</span>
+            {% elif g.status == 'Progress' %}
+            <span class="badge badge-warning"><i class="bi bi-arrow-up-circle"></i> In Progress</span>
+            {% elif g.status == 'Behind' %}
+            <span class="badge badge-warning"><i class="bi bi-exclamation-triangle"></i> Behind</span>
+            {% elif g.status == 'Overdue' %}
+            <span class="badge badge-danger"><i class="bi bi-exclamation-octagon"></i> Overdue</span>
+            {% else %}
+            <span class="badge badge-secondary">{{ g.status }}</span>
+            {% endif %}
+            <div class="flex gap-2">
+                {% if not g.achieved %}
+                <button class="btn btn-success btn-sm contribute-btn" data-id="{{ g.id }}" title="Contribute">
+                    <i class="bi bi-plus-lg"></i> Contribute
+                </button>
+                {% endif %}
+                <button class="btn btn-outline btn-sm edit-goal-btn" data-id="{{ g.id }}" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <form method="POST" action="{{ url_for('goals.delete', goal_id=g.id) }}"
+                      onsubmit="return confirmDelete(event, 'Are you sure you want to delete this goal?')">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <i class="bi bi-bullseye"></i>
+        <p>No financial goals set yet.</p>
+        <p class="mt-2">Click <strong>Add Goal</strong> to start planning for your future.</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add Goal Modal -->
+<div class="modal-overlay" id="addGoalModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-plus-circle"></i> Add Financial Goal</h3>
+            <button class="modal-close" data-modal-close><i class="bi bi-x"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('goals.add') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Goal Name</label>
+                    <input type="text" name="name" list="goalSuggestions" required placeholder="e.g. Emergency Fund">
+                    <datalist id="goalSuggestions">
+                        {% for s in suggestions %}
+                        <option value="{{ s }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Target Amount (₹)</label>
+                        <input type="number" name="target" step="0.01" min="0" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Already Saved (₹)</label>
+                        <input type="number" name="saved" step="0.01" min="0" value="0" placeholder="0.00">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Target Date</label>
+                        <input type="date" name="target_date">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select name="category">
+                            {% for cat in categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Add Goal</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Goal Modal -->
+<div class="modal-overlay" id="editGoalModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Goal</h3>
+            <button class="modal-close" data-modal-close><i class="bi bi-x"></i></button>
+        </div>
+        <form method="POST" action="" id="editGoalForm">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Goal Name</label>
+                    <input type="text" name="name" list="goalSuggestionsEdit" required>
+                    <datalist id="goalSuggestionsEdit">
+                        {% for s in suggestions %}
+                        <option value="{{ s }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Target Amount (₹)</label>
+                        <input type="number" name="target" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Already Saved (₹)</label>
+                        <input type="number" name="saved" step="0.01" min="0" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Target Date</label>
+                        <input type="date" name="target_date">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select name="category">
+                            {% for cat in categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Contribute Modal -->
+<div class="modal-overlay" id="contributeModal">
+    <div class="modal" style="max-width:420px;">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-cash-coin" style="color:var(--success);"></i> Contribute to Goal</h3>
+            <button class="modal-close" data-modal-close><i class="bi bi-x"></i></button>
+        </div>
+        <form method="POST" action="" id="contributeForm">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Contribution Amount (₹)</label>
+                    <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00" autofocus>
+                </div>
+                <p class="text-muted" style="font-size:12px;">
+                    <i class="bi bi-info-circle"></i> This amount will be added to your saved balance for the selected goal.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> Add Contribution</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Modal close handling for buttons using data-modal-close
+    document.querySelectorAll('[data-modal-close]').forEach(el => {
+        el.onclick = () => el.closest('.modal-overlay').classList.remove('active');
+    });
+});
+</script>
+{% endblock %}

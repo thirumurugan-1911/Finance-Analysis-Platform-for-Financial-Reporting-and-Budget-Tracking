@@ -1,0 +1,14 @@
+# Smart Finance Insights - Python Dependencies
+# Install: pip install -r requirements.txt
+
+Flask==3.1.3
+# Web framework - core dependency
+
+fpdf2==2.8.7
+# PDF report generation (Milestone 4 - Export Reports)
+
+openpyxl==3.1.5
+# Excel report generation (Milestone 4 - Export Reports)
+
+# Note: sqlite3 is part of Python's standard library - no installation needed.
+# Chart.js, Bootstrap Icons, and Google Fonts are loaded via CDN in templates.

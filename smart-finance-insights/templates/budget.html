@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% block title %}Budget Planner - Smart Finance Insights{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Budget Planner</h1>
+        <p class="page-subtitle">{{ month_name }} {{ selected_year }}</p>
+    </div>
+    <div class="flex gap-2">
+        <button class="btn btn-primary" data-modal-open="addBudgetModal">
+            <i class="bi bi-plus-lg"></i> Add Budget
+        </button>
+    </div>
+</div>
+
+<!-- Summary Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
+        <p class="stat-label">Total Budget</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_budget) }}</p>
+        <p class="stat-change positive"><i class="bi bi-calendar3"></i> {{ month_name }} {{ selected_year }}</p>
+    </div>
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-arrow-up-circle"></i></div>
+        <p class="stat-label">Total Spent</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_spent) }}</p>
+        <p class="stat-change {% if total_spent > total_budget %}negative{% else %}positive{% endif %}">
+            <i class="bi bi-receipt"></i> {{ "%.1f"|format(overall_percentage) }}% utilized
+        </p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-piggy-bank"></i></div>
+        <p class="stat-label">Remaining</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_remaining) }}</p>
+        <p class="stat-change {% if total_remaining >= 0 %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-{% if total_remaining >= 0 %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
+            {% if total_remaining >= 0 %}Within budget{% else %}Over budget{% endif %}
+        </p>
+    </div>
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-pie-chart"></i></div>
+        <p class="stat-label">Utilization</p>
+        <p class="stat-value">{{ "%.1f"|format(overall_percentage) }}%</p>
+        <p class="stat-change {% if overall_percentage >= 100 %}negative{% elif overall_percentage >= 80 %}positive{% else %}positive{% endif %}">
+            <i class="bi bi-graph-up"></i>
+            {% if overall_percentage >= 100 %}Exceeded{% elif overall_percentage >= 80 %}Near limit{% else %}Healthy{% endif %}
+        </p>
+    </div>
+</div>
+
+<!-- Month/Year Filter -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-calendar3"></i> Select Period</h2>
+    </div>
+    <form method="GET" action="{{ url_for('budget.index') }}" class="flex items-center gap-3" style="flex-wrap:wrap;">
+        <div class="form-group" style="margin:0; min-width:180px;">
+            <label class="form-label">Month</label>
+            <select name="month">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {{ 'selected' if selected_month == m else '' }}>
+                    {{ ["", "January", "February", "March", "April", "May", "June",
+                         "July", "August", "September", "October", "November", "December"][m] }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin:0; min-width:120px;">
+            <label class="form-label">Year</label>
+            <input type="number" name="year" value="{{ selected_year }}" min="2020" max="2099">
+        </div>
+        <div class="form-group" style="margin:0; align-self:flex-end;">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise"></i> Update</button>
+        </div>
+    </form>
+</div>
+
+<!-- Overall Progress -->
+{% if budget_data %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-bar-chart-line"></i> Overall Budget Progress</h2>
+        <span class="badge {% if overall_percentage >= 100 %}badge-danger{% elif overall_percentage >= 80 %}badge-warning{% else %}badge-success{% endif %}">
+            {{ "%.1f"|format(overall_percentage) }}% used
+        </span>
+    </div>
+    <div class="progress progress-lg">
+        <div class="progress-bar {% if overall_percentage >= 100 %}danger{% elif overall_percentage >= 80 %}warning{% endif %}"
+             style="width:{{ [overall_percentage, 100]|min }}%;"></div>
+    </div>
+    <div class="flex justify-between mt-2" style="font-size:13px;">
+        <span class="text-muted">Spent: <strong class="text-danger">₹{{ "{:,.0f}".format(total_spent) }}</strong></span>
+        <span class="text-muted">Budget: <strong class="text-primary">₹{{ "{:,.0f}".format(total_budget) }}</strong></span>
+        <span class="text-muted">Remaining: <strong class="text-success">₹{{ "{:,.0f}".format(total_remaining) }}</strong></span>
+    </div>
+</div>
+{% endif %}
+
+<!-- Budget Table -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-list-check"></i> Category Budgets</h2>
+        <span class="badge badge-secondary">{{ budget_data|length }} categories</span>
+    </div>
+    {% if budget_data %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th class="text-right">Budget</th>
+                    <th class="text-right">Spent</th>
+                    <th class="text-right">Remaining</th>
+                    <th style="min-width:180px;">Progress</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in budget_data %}
+                <tr>
+                    <td class="font-semibold">{{ b.category }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(b.budget) }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(b.spent) }}</td>
+                    <td class="text-right font-bold {% if b.remaining >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        ₹{{ "{:,.0f}".format(b.remaining) }}
+                    </td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <div class="progress progress-sm" style="flex:1;">
+                                <div class="progress-bar {% if b.status == 'exceeded' %}danger{% elif b.status == 'warning' %}warning{% elif b.status == 'good' %}{% endif %}"
+                                     style="width:{{ [b.percentage, 100]|min }}%;"></div>
+                            </div>
+                            <span style="font-size:12px; font-weight:600; min-width:42px; text-align:right;">{{ "%.0f"|format(b.percentage) }}%</span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if b.status == 'exceeded' %}
+                        <span class="badge badge-danger"><i class="bi bi-exclamation-octagon"></i> Exceeded</span>
+                        {% elif b.status == 'warning' %}
+                        <span class="badge badge-warning"><i class="bi bi-exclamation-triangle"></i> Warning</span>
+                        {% else %}
+                        <span class="badge badge-success"><i class="bi bi-check-circle"></i> Good</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        <form method="POST" action="{{ url_for('budget.delete', budget_id=b.id) }}"
+                              onsubmit="return confirmDelete(event, 'Are you sure you want to delete the budget for {{ b.category }}?')">
+                            <button type="submit" class="btn btn-danger btn-sm" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-wallet2"></i>
+        <p>No budgets set for {{ month_name }} {{ selected_year }}.</p>
+        <p class="mt-2">Click <strong>Add Budget</strong> to plan your spending by category.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Budget Modal -->
+<div class="modal-overlay" id="addBudgetModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-plus-circle"></i> Add Budget</h3>
+            <button class="modal-close" data-modal-close><i class="bi bi-x"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('budget.add') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select name="category" required>
+                        <option value="">Select a category</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Budget Amount (₹)</label>
+                    <input type="number" name="amount" step="0.01" min="0" required placeholder="0.00">
+                </div>
+                <input type="hidden" name="month" value="{{ selected_month }}">
+                <input type="hidden" name="year" value="{{ selected_year }}">
+                <p class="text-muted" style="font-size:12px;">
+                    <i class="bi bi-info-circle"></i> Budget will be set for <strong>{{ month_name }} {{ selected_year }}</strong>. If a budget already exists for the selected category, it will be updated.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Budget</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Modal close handling for buttons using data-modal-close
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[data-modal-close]').forEach(el => {
+        el.onclick = () => el.closest('.modal-overlay').classList.remove('active');
+    });
+});
+</script>
+{% endblock %}

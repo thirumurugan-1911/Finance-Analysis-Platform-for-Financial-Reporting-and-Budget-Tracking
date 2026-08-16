@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block title %}Budget Recommendations - Smart Finance Insights{% endblock %}
+{% block content %}
+{% set months = ['January', 'February', 'March', 'April', 'May', 'June',
+                 'July', 'August', 'September', 'October', 'November', 'December'] %}
+{% set recs = data.recommendations %}
+{% set high_recs = recs | selectattr('priority', 'equalto', 'High') | list %}
+{% set med_recs = recs | selectattr('priority', 'equalto', 'Medium') | list %}
+{% set low_recs = recs | selectattr('priority', 'equalto', 'Low') | list %}
+
+{% set savings_class = 'success' if data.savings_rate >= 20 else ('warning' if data.savings_rate >= 10 else 'danger') %}
+{% set savings_positive = data.savings_rate >= 20 %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Budget Recommendations</h1>
+        <p class="page-subtitle">AI-powered suggestions for {{ month_name }} {{ selected_year }}</p>
+    </div>
+    <form method="GET" action="{{ url_for('intelligence.budget_recommendations') }}" class="flex items-center gap-2" style="flex-wrap:wrap;">
+        <select name="month" class="form-control" style="width:auto;">
+            {% for m_name in months %}
+            <option value="{{ loop.index }}" {% if loop.index == selected_month %}selected{% endif %}>{{ m_name }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" name="year" value="{{ selected_year }}" min="2020" max="2099" class="form-control" style="width:100px;">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+        <a href="{{ url_for('budget.index') }}" class="btn btn-outline"><i class="bi bi-wallet2"></i> Budget Planner</a>
+    </form>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card income">
+        <div class="stat-icon"><i class="bi bi-arrow-down-circle"></i></div>
+        <p class="stat-label">Income</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_income) }}</p>
+        <p class="stat-change positive"><i class="bi bi-calendar-month"></i> {{ month_name }} earnings</p>
+    </div>
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-arrow-up-circle"></i></div>
+        <p class="stat-label">Expenses</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_expense) }}</p>
+        <p class="stat-change negative">
+            <i class="bi bi-percent"></i>
+            {{ "%.1f"|format((data.total_expense / data.total_income * 100) if data.total_income else 0) }}% of income
+        </p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-piggy-bank"></i></div>
+        <p class="stat-label">Savings Rate</p>
+        <p class="stat-value">{{ "%.1f"|format(data.savings_rate) }}%</p>
+        <p class="stat-change {% if savings_positive %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-arrow-{% if savings_positive %}up{% else %}down{% endif %}"></i>
+            ₹{{ "{:,.0f}".format(data.savings) }} saved
+        </p>
+    </div>
+</div>
+
+<!-- Savings Rate Progress -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-speedometer2"></i> Savings Rate Health</h2>
+        <span class="badge badge-{{ savings_class }}">
+            {% if savings_positive %}On Track{% elif data.savings_rate >= 10 %}Needs Improvement{% else %}Critical{% endif %}
+        </span>
+    </div>
+    <div class="flex items-center justify-between mb-2">
+        <span style="font-size:13px; color:var(--text-muted);">Target: 20%+ of income</span>
+        <span class="font-bold text-{{ savings_class }}">{{ "%.1f"|format(data.savings_rate) }}%</span>
+    </div>
+    <div class="progress progress-lg">
+        <div class="progress-bar {{ savings_class }}" style="width:{{ [data.savings_rate, 100] | min }}%;"></div>
+    </div>
+    <div class="flex items-center justify-between mt-2" style="font-size:12px; color:var(--text-muted);">
+        <span>Saved: ₹{{ "{:,.0f}".format(data.savings) }}</span>
+        <span>Income: ₹{{ "{:,.0f}".format(data.total_income) }}</span>
+        <span>Expense: ₹{{ "{:,.0f}".format(data.total_expense) }}</span>
+    </div>
+</div>
+
+<!-- Summary Counts -->
+<div class="grid grid-3 mb-4">
+    <div class="card text-center" style="padding:16px;">
+        <div class="insight-icon danger" style="margin:0 auto 8px;"><i class="bi bi-exclamation-octagon"></i></div>
+        <p style="font-size:26px; font-weight:800; color:var(--danger);">{{ high_recs|length }}</p>
+        <p style="font-size:12px; color:var(--text-muted);">High Priority</p>
+    </div>
+    <div class="card text-center" style="padding:16px;">
+        <div class="insight-icon warning" style="margin:0 auto 8px;"><i class="bi bi-exclamation-triangle"></i></div>
+        <p style="font-size:26px; font-weight:800; color:var(--warning);">{{ med_recs|length }}</p>
+        <p style="font-size:12px; color:var(--text-muted);">Medium Priority</p>
+    </div>
+    <div class="card text-center" style="padding:16px;">
+        <div class="insight-icon success" style="margin:0 auto 8px;"><i class="bi bi-check-circle"></i></div>
+        <p style="font-size:26px; font-weight:800; color:var(--success);">{{ low_recs|length }}</p>
+        <p style="font-size:12px; color:var(--text-muted);">Low Priority</p>
+    </div>
+</div>
+
+<!-- Personalized Recommendations -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-lightbulb"></i> Personalized Recommendations</h2>
+        <span class="badge badge-secondary">{{ recs|length }} suggestions</span>
+    </div>
+
+    {% if recs %}
+
+        {% if high_recs %}
+        <div class="flex items-center gap-2 mb-3 mt-2">
+            <span class="badge badge-danger"><i class="bi bi-flag"></i> High Priority</span>
+            <span style="font-size:13px; color:var(--text-muted);">Act on these urgently</span>
+        </div>
+        {% for r in high_recs %}
+        <div class="insight-card" style="border-left:4px solid var(--danger);">
+            <div class="insight-icon danger"><i class="bi bi-{% if r.type == 'reduce' %}dash-circle{% elif r.type == 'increase_savings' %}piggy-bank{% else %}exclamation-octagon{% endif %}"></i></div>
+            <div style="flex:1;">
+                <div class="flex items-center justify-between mb-1" style="flex-wrap:wrap; gap:6px;">
+                    <p class="insight-title">{{ r.category }}</p>
+                    <span class="badge badge-danger">{{ r.priority }}</span>
+                </div>
+                <p class="insight-message">{{ r.message }}</p>
+                {% if r.amount > 0 %}
+                <p class="mt-2" style="font-size:12px; color:var(--text-muted);">
+                    <i class="bi bi-cash"></i> Amount: <strong class="text-danger">₹{{ "{:,.0f}".format(r.amount) }}</strong>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if med_recs %}
+        <div class="flex items-center gap-2 mb-3 mt-4">
+            <span class="badge badge-warning"><i class="bi bi-flag"></i> Medium Priority</span>
+            <span style="font-size:13px; color:var(--text-muted);">Worth reviewing this month</span>
+        </div>
+        {% for r in med_recs %}
+        <div class="insight-card" style="border-left:4px solid var(--warning);">
+            <div class="insight-icon warning"><i class="bi bi-{% if r.type == 'warning' %}exclamation-triangle{% elif r.type == 'set_budget' %}wallet2{% else %}lightbulb{% endif %}"></i></div>
+            <div style="flex:1;">
+                <div class="flex items-center justify-between mb-1" style="flex-wrap:wrap; gap:6px;">
+                    <p class="insight-title">{{ r.category }}</p>
+                    <span class="badge badge-warning">{{ r.priority }}</span>
+                </div>
+                <p class="insight-message">{{ r.message }}</p>
+                {% if r.amount > 0 %}
+                <p class="mt-2" style="font-size:12px; color:var(--text-muted);">
+                    <i class="bi bi-cash"></i> Amount: <strong class="text-warning">₹{{ "{:,.0f}".format(r.amount) }}</strong>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if low_recs %}
+        <div class="flex items-center gap-2 mb-3 mt-4">
+            <span class="badge badge-success"><i class="bi bi-flag"></i> Low Priority</span>
+            <span style="font-size:13px; color:var(--text-muted);">Doing well - keep it up</span>
+        </div>
+        {% for r in low_recs %}
+        <div class="insight-card" style="border-left:4px solid var(--success);">
+            <div class="insight-icon success"><i class="bi bi-check-circle"></i></div>
+            <div style="flex:1;">
+                <div class="flex items-center justify-between mb-1" style="flex-wrap:wrap; gap:6px;">
+                    <p class="insight-title">{{ r.category }}</p>
+                    <span class="badge badge-success">{{ r.priority }}</span>
+                </div>
+                <p class="insight-message">{{ r.message }}</p>
+                {% if r.amount > 0 %}
+                <p class="mt-2" style="font-size:12px; color:var(--text-muted);">
+                    <i class="bi bi-cash"></i> Amount: <strong class="text-success">₹{{ "{:,.0f}".format(r.amount) }}</strong>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-check-circle text-success"></i>
+        <p>No recommendations needed for {{ month_name }} - your spending looks balanced!</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // No charts on this page, but reserve block for future visualizations.
+    console.log('Budget recommendations loaded for {{ month_name }} {{ selected_year }}.');
+});
+</script>
+{% endblock %}

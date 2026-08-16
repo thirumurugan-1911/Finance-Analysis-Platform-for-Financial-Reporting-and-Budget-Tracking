@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}JARVIS - AI Financial Assistant{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-robot"></i> JARVIS - AI Financial Assistant</h1>
+        <p class="page-subtitle">Your intelligent finance companion</p>
+    </div>
+    <form method="POST" action="{{ url_for('jarvis.clear') }}" onsubmit="return confirmDelete(event, 'Clear all chat history? This cannot be undone.')">
+        <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Clear Chat</button>
+    </form>
+</div>
+
+<!-- Info Card -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-info-circle"></i> What can JARVIS help you with?</h2>
+    </div>
+    <div class="flex gap-2" style="flex-wrap:wrap;">
+        <span class="badge badge-primary"><i class="bi bi-receipt"></i> Expense Analysis</span>
+        <span class="badge badge-primary"><i class="bi bi-wallet2"></i> Budget Recommendations</span>
+        <span class="badge badge-primary"><i class="bi bi-graph-up"></i> Investment Portfolio</span>
+        <span class="badge badge-primary"><i class="bi bi-bullseye"></i> Financial Goals</span>
+        <span class="badge badge-primary"><i class="bi bi-heart-pulse"></i> Health Score</span>
+        <span class="badge badge-primary"><i class="bi bi-piggy-bank"></i> Savings Tips</span>
+        <span class="badge badge-primary"><i class="bi bi-stars"></i> Financial Insights</span>
+    </div>
+</div>
+
+<!-- Chat Container -->
+<div class="card" style="padding:0; overflow:hidden; max-width:920px; margin:0 auto;">
+    <div class="chat-container" style="height:calc(100vh - 360px); min-height:450px; max-width:none; margin:0;">
+        <div class="chat-messages" id="chatMessages">
+            {% if history %}
+                {% for message in history %}
+                <div class="chat-message {{ message.role }}">
+                    <div class="chat-avatar {% if message.role == 'user' %}user{% else %}jarvis{% endif %}">
+                        <i class="bi bi-{% if message.role == 'user' %}person{% else %}robot{% endif %}"></i>
+                    </div>
+                    <div class="chat-bubble">{{ message.message }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="chat-message assistant">
+                    <div class="chat-avatar jarvis"><i class="bi bi-robot"></i></div>
+                    <div class="chat-bubble">Hello! I'm JARVIS, your AI Financial Assistant.
+
+I can help you analyze expenses, track budgets, monitor investments, and achieve your financial goals.
+
+Try one of the suggestions below or ask me anything about your finances!</div>
+                </div>
+            {% endif %}
+        </div>
+        <div class="chat-input-area">
+            <div class="chat-suggestions">
+                <button class="chat-suggestion" type="button">Show my expenses</button>
+                <button class="chat-suggestion" type="button">How are my investments?</button>
+                <button class="chat-suggestion" type="button">What's my financial health?</button>
+                <button class="chat-suggestion" type="button">Show my goals</button>
+                <button class="chat-suggestion" type="button">Give me budget tips</button>
+                <button class="chat-suggestion" type="button">How can I save more?</button>
+            </div>
+            <form class="chat-input-wrapper" onsubmit="return false;">
+                <textarea id="chatInput" class="chat-input" placeholder="Ask JARVIS about your finances..." rows="1"></textarea>
+                <button type="button" class="btn btn-primary" onclick="sendChatMessage()"><i class="bi bi-send"></i> Send</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

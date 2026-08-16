@@ -1,0 +1,366 @@
+{% extends 'base.html' %}
+{% block title %}Investment Portfolio - Smart Finance Insights{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Investment Portfolio</h1>
+        <p class="page-subtitle">Track and manage your investments across asset classes</p>
+    </div>
+    <div class="flex gap-2">
+        <a href="{{ url_for('investments.portfolio_analytics') }}" class="btn btn-outline">
+            <i class="bi bi-pie-chart"></i> Analytics
+        </a>
+        <button class="btn btn-primary" data-modal-open="addInvModal">
+            <i class="bi bi-plus-lg"></i> Add Investment
+        </button>
+    </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card investment">
+        <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+        <p class="stat-label">Total Invested</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_invested) }}</p>
+        <p class="stat-change positive"><i class="bi bi-calendar3"></i> Capital deployed</p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-graph-up-arrow"></i></div>
+        <p class="stat-label">Current Value</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_current) }}</p>
+        <p class="stat-change positive"><i class="bi bi-wallet2"></i> {{ investments|length }} holdings</p>
+    </div>
+    <div class="stat-card {% if total_profit_loss >= 0 %}income{% else %}expense{% endif %}">
+        <div class="stat-icon"><i class="bi bi-{% if total_profit_loss >= 0 %}trending-up{% else %}trending-down{% endif %}"></i></div>
+        <p class="stat-label">Total P/L</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_profit_loss) }}</p>
+        <p class="stat-change {% if total_profit_loss >= 0 %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-arrow-{% if total_profit_loss >= 0 %}up{% else %}down{% endif %}"></i>
+            {% if total_profit_loss >= 0 %}Profit{% else %}Loss{% endif %}
+        </p>
+    </div>
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-percent"></i></div>
+        <p class="stat-label">Overall ROI</p>
+        <p class="stat-value">{{ "%.1f"|format(total_roi) }}%</p>
+        <p class="stat-change {% if total_roi >= 0 %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-lightning"></i> Return on capital
+        </p>
+    </div>
+</div>
+
+<!-- Investments + Allocation -->
+<div class="grid mb-4" style="grid-template-columns: 2fr 1fr;">
+    <!-- Investments Table -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-table"></i> Holdings</h2>
+            <span class="badge badge-secondary">{{ investments|length }} assets</span>
+        </div>
+        {% if investments %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Asset Type</th>
+                        <th class="text-right">Invested</th>
+                        <th class="text-right">Current</th>
+                        <th class="text-right">P/L</th>
+                        <th class="text-right">ROI</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in investments %}
+                    <tr>
+                        <td>
+                            <div class="font-semibold">{{ inv.name }}</div>
+                            <div class="text-muted" style="font-size:11px;">{{ inv.purchase_date }}</div>
+                        </td>
+                        <td><span class="badge badge-info">{{ inv.asset_type }}</span></td>
+                        <td class="text-right">₹{{ "{:,.0f}".format(inv.invested) }}</td>
+                        <td class="text-right font-semibold">₹{{ "{:,.0f}".format(inv.current) }}</td>
+                        <td class="text-right font-bold {% if inv.profit_loss >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if inv.profit_loss >= 0 %}+{% endif %}₹{{ "{:,.0f}".format(inv.profit_loss) }}
+                        </td>
+                        <td class="text-right font-bold {% if inv.roi >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if inv.roi >= 0 %}+{% endif %}{{ "%.1f"|format(inv.roi) }}%
+                        </td>
+                        <td>
+                            {% if inv.status == 'Profit' %}
+                            <span class="badge badge-success"><i class="bi bi-arrow-up"></i> Profit</span>
+                            {% else %}
+                            <span class="badge badge-danger"><i class="bi bi-arrow-down"></i> Loss</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right">
+                            <div class="flex gap-2" style="justify-content:flex-end;">
+                                <button class="btn btn-outline btn-sm edit-inv-btn" data-id="{{ inv.id }}" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <form method="POST" action="{{ url_for('investments.delete', inv_id=inv.id) }}"
+                                      onsubmit="return confirmDelete(event, 'Are you sure you want to delete this investment?')">
+                                    <button type="submit" class="btn btn-danger btn-sm" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <p>No investments yet.</p>
+            <p class="mt-2">Click <strong>Add Investment</strong> to start tracking your portfolio.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Asset Allocation -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-pie-chart"></i> Asset Allocation</h2>
+        </div>
+        {% if allocation_data %}
+        <div class="chart-container" style="height:240px;">
+            <canvas id="allocationChart"></canvas>
+        </div>
+        <div class="mt-3">
+            {% for a in allocation_data %}
+            <div class="flex items-center justify-between" style="padding:6px 0; border-bottom:1px solid var(--border-light); font-size:13px;">
+                <div class="flex items-center gap-2">
+                    <span style="width:10px; height:10px; border-radius:50%; display:inline-block; background:{{ ['#16a34a','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'][loop.index0 % 7] }};"></span>
+                    <span class="font-semibold">{{ a.asset }}</span>
+                </div>
+                <div class="text-right">
+                    <span class="font-bold">{{ "%.1f"|format(a.percentage) }}%</span>
+                    <span class="text-muted" style="font-size:11px;"> (₹{{ "{:,.0f}".format(a.value) }})</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-pie-chart"></i>
+            <p>No allocation data.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Top & Low Performers -->
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-trophy" style="color:var(--warning);"></i> Top Performers</h2>
+            <span class="badge badge-success">Best ROI</span>
+        </div>
+        {% if top_performers %}
+        <div>
+            {% for inv in top_performers %}
+            <div class="flex items-center justify-between" style="padding:12px 0; {% if not loop.last %}border-bottom:1px solid var(--border-light);{% endif %}">
+                <div class="flex items-center gap-3">
+                    <div style="width:36px; height:36px; border-radius:50%; background:#fef3c7; color:var(--warning); display:flex; align-items:center; justify-content:center; font-weight:700;">
+                        {{ loop.index }}
+                    </div>
+                    <div>
+                        <div class="font-semibold">{{ inv.name }}</div>
+                        <div class="text-muted" style="font-size:12px;">{{ inv.asset_type }}</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="badge {% if inv.roi >= 0 %}badge-success{% else %}badge-danger{% endif %}">
+                        {% if inv.roi >= 0 %}+{% endif %}{{ "%.1f"|format(inv.roi) }}%
+                    </span>
+                    <div class="text-muted" style="font-size:11px; margin-top:2px;">
+                        ₹{{ "{:,.0f}".format(inv.current) }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-trophy"></i><p>No data available</p></div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-exclamation-triangle" style="color:var(--danger);"></i> Needs Attention</h2>
+            <span class="badge badge-warning">Underperforming</span>
+        </div>
+        {% if low_performers %}
+        <div>
+            {% for inv in low_performers %}
+            <div class="flex items-center justify-between" style="padding:12px 0; {% if not loop.last %}border-bottom:1px solid var(--border-light);{% endif %}">
+                <div class="flex items-center gap-3">
+                    <div style="width:36px; height:36px; border-radius:50%; background:#fee2e2; color:var(--danger); display:flex; align-items:center; justify-content:center; font-weight:700;">
+                        <i class="bi bi-arrow-down"></i>
+                    </div>
+                    <div>
+                        <div class="font-semibold">{{ inv.name }}</div>
+                        <div class="text-muted" style="font-size:12px;">{{ inv.asset_type }}</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="badge {% if inv.roi >= 0 %}badge-success{% else %}badge-danger{% endif %}">
+                        {% if inv.roi >= 0 %}+{% endif %}{{ "%.1f"|format(inv.roi) }}%
+                    </span>
+                    <div class="text-muted" style="font-size:11px; margin-top:2px;">
+                        ₹{{ "{:,.0f}".format(inv.current) }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-shield-check"></i><p>No data available</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Investment Modal -->
+<div class="modal-overlay" id="addInvModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-plus-circle"></i> Add Investment</h3>
+            <button class="modal-close" data-modal-close><i class="bi bi-x"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('investments.add') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Asset Type</label>
+                    <select name="asset_type" required>
+                        <option value="">Select asset type</option>
+                        {% for at in asset_types %}
+                        <option value="{{ at }}">{{ at }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Investment Name</label>
+                    <input type="text" name="name" required placeholder="e.g. Reliance Industries, HDFC Mid-Cap Fund">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Invested Amount (₹)</label>
+                        <input type="number" name="invested" step="0.01" min="0" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Current Value (₹)</label>
+                        <input type="number" name="current" step="0.01" min="0" required placeholder="0.00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Purchase Date</label>
+                    <input type="date" name="purchase_date">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Add Investment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Investment Modal -->
+<div class="modal-overlay" id="editInvModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Investment</h3>
+            <button class="modal-close" data-modal-close><i class="bi bi-x"></i></button>
+        </div>
+        <form method="POST" action="" id="editInvForm">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Asset Type</label>
+                    <select name="asset_type" required>
+                        {% for at in asset_types %}
+                        <option value="{{ at }}">{{ at }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Investment Name</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Invested Amount (₹)</label>
+                        <input type="number" name="invested" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Current Value (₹)</label>
+                        <input type="number" name="current" step="0.01" min="0" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Purchase Date</label>
+                    <input type="date" name="purchase_date">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set today's date as default for add investment date input
+    const today = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('#addInvModal input[type="date"]').forEach(i => { if (!i.value) i.value = today; });
+
+    // Modal close handling for buttons using data-modal-close
+    document.querySelectorAll('[data-modal-close]').forEach(el => {
+        el.onclick = () => el.closest('.modal-overlay').classList.remove('active');
+    });
+
+    // Asset Allocation Doughnut Chart
+    const allocData = {{ allocation_data | tojson }};
+    if (allocData && allocData.length > 0) {
+        const colors = ['#16a34a', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
+        createChart('allocationChart', {
+            type: 'doughnut',
+            data: {
+                labels: allocData.map(a => a.asset),
+                datasets: [{
+                    data: allocData.map(a => a.value),
+                    backgroundColor: colors.slice(0, allocData.length),
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                                return ctx.label + ': ₹' + ctx.parsed.toLocaleString('en-IN') + ' (' + pct + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

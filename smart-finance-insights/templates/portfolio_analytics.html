@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+{% block title %}Portfolio Analytics - Smart Finance Insights{% endblock %}
+{% block content %}
+{% set colors = ['#16a34a', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'] %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-pie-chart"></i> Portfolio Analytics Dashboard</h1>
+        <p class="page-subtitle">Comprehensive investment analysis</p>
+    </div>
+    <a href="{{ url_for('investments.index') }}" class="btn btn-outline"><i class="bi bi-arrow-left"></i> Back to Investments</a>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card investment">
+        <div class="stat-icon"><i class="bi bi-graph-up"></i></div>
+        <p class="stat-label">Total Invested</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_invested) }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-cash"></i> Capital invested</p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-cash-coin"></i></div>
+        <p class="stat-label">Current Value</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_current) }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-wallet"></i> Portfolio value</p>
+    </div>
+    <div class="stat-card {% if total_pl >= 0 %}income{% else %}expense{% endif %}">
+        <div class="stat-icon"><i class="bi bi-arrow-{% if total_pl >= 0 %}up{% else %}down{% endif %}-circle"></i></div>
+        <p class="stat-label">Total P/L</p>
+        <p class="stat-value">{{ "+" if total_pl >= 0 }}₹{{ "{:,.0f}".format(total_pl) }}</p>
+        <p class="stat-change {% if total_pl >= 0 %}positive{% else %}negative{% endif %}"><i class="bi bi-arrow-{% if total_pl >= 0 %}up{% else %}down{% endif %}"></i> Net {% if total_pl >= 0 %}gain{% else %}loss{% endif %}</p>
+    </div>
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-percent"></i></div>
+        <p class="stat-label">Overall ROI</p>
+        <p class="stat-value">{{ "+" if total_roi >= 0 }}{{ "%.1f"|format(total_roi) }}%</p>
+        <p class="stat-change {% if total_roi >= 0 %}positive{% else %}negative{% endif %}"><i class="bi bi-trending-{% if total_roi >= 0 %}up{% else %}down{% endif %}"></i> Return on investment</p>
+    </div>
+</div>
+
+<!-- Risk Analysis + Asset Allocation -->
+<div class="grid grid-3 mb-4">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-shield-exclamation"></i> Risk Analysis</h2>
+        </div>
+        <div class="text-center mb-3">
+            <span class="badge {% if risk_score == 'Low' %}badge-success{% elif risk_score == 'Medium' %}badge-warning{% else %}badge-danger{% endif %}" style="font-size:14px; padding:6px 16px;">
+                <i class="bi bi-shield-{% if risk_score == 'Low' %}check{% elif risk_score == 'Medium' %}exclamation{% else %}x{% endif %}"></i>
+                {{ risk_score }} Risk
+            </span>
+        </div>
+        <p class="text-muted" style="font-size:12px; margin-bottom:6px;">Risk Level Score</p>
+        <div class="progress progress-lg mb-2">
+            <div class="progress-bar {% if risk_score == 'Low' %}success{% elif risk_score == 'Medium' %}warning{% else %}danger{% endif %}" style="width:{{ risk_level }}%;"></div>
+        </div>
+        <div class="flex justify-between text-muted" style="font-size:11px; margin-bottom:16px;">
+            <span>0 (Safe)</span>
+            <span class="font-bold">{{ risk_level }}/100</span>
+            <span>100 (Risky)</span>
+        </div>
+        <div style="border-top:1px solid var(--border-light); padding-top:12px;">
+            <div class="flex justify-between mb-3" style="font-size:13px;">
+                <span class="text-muted">Asset Types</span>
+                <span class="font-bold">{{ num_assets }}</span>
+            </div>
+            <div class="insight-card" style="margin-bottom:0;">
+                <div class="insight-icon {% if risk_score == 'Low' %}success{% elif risk_score == 'Medium' %}warning{% else %}danger{% endif %}">
+                    <i class="bi bi-{% if risk_score == 'Low' %}check-circle{% elif risk_score == 'Medium' %}info-circle{% else %}exclamation-triangle{% endif %}"></i>
+                </div>
+                <div>
+                    <p class="insight-title">Diversification</p>
+                    <p class="insight-message">
+                        {% if risk_score == 'Low' %}
+                        Excellent! Your portfolio is well-diversified across {{ num_assets }} asset types, reducing exposure risk.
+                        {% elif risk_score == 'Medium' %}
+                        Moderate diversification. Consider adding more asset types to lower your risk profile.
+                        {% else %}
+                        High concentration risk. Diversify across more asset classes to protect your portfolio.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="grid-column: span 2;">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-pie-chart"></i> Asset Allocation</h2>
+            <span class="badge badge-secondary">{{ allocation|length }} asset types</span>
+        </div>
+        {% if allocation %}
+        <div class="grid grid-2">
+            <div class="chart-container">
+                <canvas id="allocChart"></canvas>
+            </div>
+            <div>
+                {% for a in allocation %}
+                <div class="flex items-center justify-between" style="padding:10px 0; border-bottom:1px solid var(--border-light);">
+                    <div class="flex items-center gap-2">
+                        <span style="width:12px; height:12px; border-radius:3px; background:{{ colors[loop.index0 % colors|length] }};"></span>
+                        <span class="font-semibold" style="font-size:13px;">{{ a.asset }}</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-bold" style="font-size:13px;">₹{{ "{:,.0f}".format(a.value) }}</div>
+                        <div class="text-muted" style="font-size:11px;">{{ "%.1f"|format(a.pct) }}%</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-inbox"></i><p>No investments to allocate</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Portfolio Growth Chart -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-graph-up-arrow"></i> Portfolio Growth</h2>
+        <span class="badge badge-secondary">Last 6 months</span>
+    </div>
+    <div class="chart-container">
+        <canvas id="growthChart"></canvas>
+    </div>
+</div>
+
+<!-- Investment Details Table -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-table"></i> Investment Details</h2>
+        <span class="badge badge-secondary">{{ investments|length }} investments</span>
+    </div>
+    {% if investments %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>Investment</th><th>Asset Type</th><th class="text-right">Invested</th><th class="text-right">Current</th><th class="text-right">P/L</th><th class="text-right">ROI</th></tr>
+            </thead>
+            <tbody>
+                {% for inv in investments %}
+                <tr>
+                    <td class="font-semibold">{{ inv.name }}</td>
+                    <td><span class="badge badge-info">{{ inv.asset }}</span></td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(inv.invested) }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(inv.current) }}</td>
+                    <td class="text-right font-bold {% if inv.pl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "+" if inv.pl >= 0 }}₹{{ "{:,.0f}".format(inv.pl) }}</td>
+                    <td class="text-right font-bold {% if inv.roi >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "+" if inv.roi >= 0 }}{{ "%.1f"|format(inv.roi) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background:var(--bg); font-weight:700;">
+                    <td colspan="2">TOTAL</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(total_invested) }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(total_current) }}</td>
+                    <td class="text-right {% if total_pl >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "+" if total_pl >= 0 }}₹{{ "{:,.0f}".format(total_pl) }}</td>
+                    <td class="text-right {% if total_roi >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "+" if total_roi >= 0 }}{{ "%.1f"|format(total_roi) }}%</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="bi bi-inbox"></i><p>No investments yet. Add investments to see analytics.</p></div>
+    {% endif %}
+</div>
+
+<!-- Performance Summary -->
+{% if investments %}
+{% set sorted_inv = investments|sort(attribute='roi', reverse=true) %}
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-trophy"></i> Top Performers</h2>
+            <span class="badge badge-success"><i class="bi bi-arrow-up"></i> Best ROI</span>
+        </div>
+        {% for inv in sorted_inv[:3] %}
+        <div class="flex items-center justify-between" style="padding:12px 0; {% if not loop.last %}border-bottom:1px solid var(--border-light);{% endif %}">
+            <div class="flex items-center gap-3">
+                <div style="width:32px; height:32px; border-radius:50%; background:#d1fae5; color:var(--success); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">{{ loop.index }}</div>
+                <div>
+                    <p class="font-semibold" style="font-size:14px;">{{ inv.name }}</p>
+                    <p class="text-muted" style="font-size:12px;"><span class="badge badge-info badge-sm" style="padding:2px 8px; font-size:10px;">{{ inv.asset }}</span></p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="font-bold {% if inv.roi >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size:14px;">{{ "+" if inv.roi >= 0 }}{{ "%.1f"|format(inv.roi) }}%</p>
+                <p class="text-muted" style="font-size:11px;">₹{{ "{:,.0f}".format(inv.current) }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-arrow-down-circle"></i> Needs Attention</h2>
+            <span class="badge badge-warning"><i class="bi bi-arrow-down"></i> Lowest ROI</span>
+        </div>
+        {% for inv in sorted_inv[-3:][::-1] %}
+        <div class="flex items-center justify-between" style="padding:12px 0; {% if not loop.last %}border-bottom:1px solid var(--border-light);{% endif %}">
+            <div class="flex items-center gap-3">
+                <div style="width:32px; height:32px; border-radius:50%; background:#fee2e2; color:var(--danger); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">{{ loop.index }}</div>
+                <div>
+                    <p class="font-semibold" style="font-size:14px;">{{ inv.name }}</p>
+                    <p class="text-muted" style="font-size:12px;"><span class="badge badge-info" style="padding:2px 8px; font-size:10px;">{{ inv.asset }}</span></p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="font-bold {% if inv.roi >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size:14px;">{{ "+" if inv.roi >= 0 }}{{ "%.1f"|format(inv.roi) }}%</p>
+                <p class="text-muted" style="font-size:11px;">₹{{ "{:,.0f}".format(inv.current) }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const allocData = {{ allocation | tojson }};
+    const growthData = {{ growth_data | tojson }};
+    const chartColors = ['#16a34a', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
+
+    // Asset Allocation Doughnut Chart
+    if (allocData.length > 0) {
+        createChart('allocChart', {
+            type: 'doughnut',
+            data: {
+                labels: allocData.map(a => a.asset),
+                datasets: [{
+                    data: allocData.map(a => a.value),
+                    backgroundColor: chartColors,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '62%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const a = allocData[ctx.dataIndex];
+                                return ctx.label + ': ₹' + Number(ctx.parsed).toLocaleString('en-IN') + ' (' + a.pct.toFixed(1) + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Portfolio Growth Line Chart
+    if (growthData.length > 0) {
+        const canvas = document.getElementById('growthChart');
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 280);
+        gradient.addColorStop(0, 'rgba(22,163,74,0.35)');
+        gradient.addColorStop(1, 'rgba(22,163,74,0)');
+        createChart('growthChart', {
+            type: 'line',
+            data: {
+                labels: growthData.map(g => g.month),
+                datasets: [{
+                    label: 'Portfolio Value',
+                    data: growthData.map(g => g.value),
+                    borderColor: '#16a34a',
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointBackgroundColor: '#16a34a',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) { return 'Portfolio Value: ₹' + Number(ctx.parsed.y).toLocaleString('en-IN'); }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: { callback: function(v) { return '₹' + (v / 1000) + 'k'; } }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}Notifications &amp; Alerts - Smart Finance Insights{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-bell"></i> Notifications &amp; Alerts</h1>
+        <p class="page-subtitle">Stay informed about your finances</p>
+    </div>
+    <div class="flex gap-2">
+        <form method="POST" action="{{ url_for('notifications.mark_all_read') }}">
+            <button type="submit" class="btn btn-outline"><i class="bi bi-check2-all"></i> Mark All Read</button>
+        </form>
+        <form method="POST" action="{{ url_for('notifications.clear_all') }}" onsubmit="return confirmDelete(event, 'Clear ALL notifications? This cannot be undone.')">
+            <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Clear All</button>
+        </form>
+    </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-bell"></i></div>
+        <p class="stat-label">Total Notifications</p>
+        <p class="stat-value">{{ total_count }}</p>
+        <p class="stat-change text-muted"><i class="bi bi-list"></i> All-time entries</p>
+    </div>
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-exclamation-circle"></i></div>
+        <p class="stat-label">Active Alerts</p>
+        <p class="stat-value">{{ active_count }}</p>
+        <p class="stat-change negative"><i class="bi bi-lightning"></i> Need attention</p>
+    </div>
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+        <p class="stat-label">High Priority</p>
+        <p class="stat-value">{{ high_count }}</p>
+        <p class="stat-change negative"><i class="bi bi-flag"></i> Urgent items</p>
+    </div>
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-info-circle"></i></div>
+        <p class="stat-label">Medium Priority</p>
+        <p class="stat-value">{{ medium_count }}</p>
+        <p class="stat-change text-warning"><i class="bi bi-flag"></i> Moderate items</p>
+    </div>
+</div>
+
+<!-- Notifications List -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-bell"></i> All Notifications</h2>
+        <div class="flex gap-2">
+            <span class="badge badge-secondary">{{ total_count }} total</span>
+            <span class="badge badge-danger">{{ active_count }} active</span>
+        </div>
+    </div>
+    {% if notifications %}
+        {% for n in notifications %}
+        <div class="notif-item" style="{% if n.status == 'Active' %}background:{% if n.priority == 'High' %}#fef2f2{% elif n.priority == 'Medium' %}#fffbeb{% else %}#f0fdf4{% endif %}; border-left:3px solid {% if n.priority == 'High' %}var(--danger){% elif n.priority == 'Medium' %}var(--warning){% else %}var(--success){% endif %};{% endif %}">
+            <div class="notif-icon {{ n.priority|lower }}">
+                <i class="bi bi-{% if 'Budget' in n.type %}exclamation-triangle{% elif 'Bill' in n.type %}calendar{% elif 'Goal' in n.type %}bullseye{% elif 'Investment' in n.type %}graph-up{% elif 'Savings' in n.type or 'Low Balance' in n.type %}info-circle{% else %}bell{% endif %}"></i>
+            </div>
+            <div class="notif-content">
+                <p class="notif-type">{{ n.type }}</p>
+                <p class="notif-message">{{ n.message }}</p>
+                <p class="notif-meta flex items-center gap-2" style="flex-wrap:wrap;">
+                    <span class="badge {% if n.priority == 'High' %}badge-danger{% elif n.priority == 'Medium' %}badge-warning{% else %}badge-info{% endif %}">{{ n.priority }}</span>
+                    <span class="badge {% if n.status == 'Active' %}badge-danger{% elif n.status == 'Completed' %}badge-success{% else %}badge-warning{% endif %}">
+                        {% if n.status == 'Active' %}<i class="bi bi-exclamation-circle"></i>{% elif n.status == 'Completed' %}<i class="bi bi-check-circle"></i>{% else %}<i class="bi bi-clock"></i>{% endif %}
+                        {{ n.status }}
+                    </span>
+                    <span class="text-muted"><i class="bi bi-clock"></i> {{ n.created_at }}</span>
+                </p>
+            </div>
+            <div class="flex items-center gap-2" style="flex-shrink:0;">
+                {% if n.status == 'Active' %}
+                <form method="POST" action="{{ url_for('notifications.mark_read', notif_id=n.id) }}">
+                    <button type="submit" class="btn btn-outline btn-sm" title="Mark as Read"><i class="bi bi-check2"></i> Mark Read</button>
+                </form>
+                {% endif %}
+                <form method="POST" action="{{ url_for('notifications.delete', notif_id=n.id) }}" onsubmit="return confirmDelete(event, 'Delete this notification?')">
+                    <button type="submit" class="btn btn-danger btn-sm btn-icon" title="Delete"><i class="bi bi-trash"></i></button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <i class="bi bi-bell-slash"></i>
+            <p>No notifications yet. You're all caught up!</p>
+            <p class="text-muted mt-2" style="font-size:12px;">New alerts about budgets, bills, goals, and investments will appear here.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

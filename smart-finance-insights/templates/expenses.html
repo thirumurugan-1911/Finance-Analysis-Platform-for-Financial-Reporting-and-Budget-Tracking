@@ -1,0 +1,286 @@
+{% extends 'base.html' %}
+{% block title %}Transactions - Smart Finance Insights{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Transactions</h1>
+        <p class="page-subtitle">{{ month_name }} {{ selected_year }}</p>
+    </div>
+    <div class="flex gap-2">
+        <button class="btn btn-primary" data-modal-open="addTxnModal">
+            <i class="bi bi-plus-lg"></i> Add Transaction
+        </button>
+    </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card income">
+        <div class="stat-icon"><i class="bi bi-arrow-down-circle"></i></div>
+        <p class="stat-label">Total Income</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_income) }}</p>
+        <p class="stat-change positive"><i class="bi bi-arrow-up"></i> {{ month_name }} income</p>
+    </div>
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-arrow-up-circle"></i></div>
+        <p class="stat-label">Total Expense</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(total_expense) }}</p>
+        <p class="stat-change {% if total_expense > total_income %}negative{% else %}positive{% endif %}">
+            <i class="bi bi-receipt"></i> {{ transactions|length }} transactions
+        </p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
+        <p class="stat-label">Balance</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(balance) }}</p>
+        <p class="stat-change {% if balance >= 0 %}positive{% else %}negative{% endif %}">
+            <i class="bi bi-{% if balance >= 0 %}trending-up{% else %}trending-down{% endif %}"></i>
+            {% if balance >= 0 %}Surplus{% else %}Deficit{% endif %}
+        </p>
+    </div>
+</div>
+
+<!-- Filter Card -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-funnel"></i> Filter Transactions</h2>
+    </div>
+    <form method="GET" action="{{ url_for('expenses.index') }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Type</label>
+                <select name="type">
+                    <option value="all" {{ 'selected' if filter_type == 'all' else '' }}>All</option>
+                    <option value="income" {{ 'selected' if filter_type == 'income' else '' }}>Income</option>
+                    <option value="expense" {{ 'selected' if filter_type == 'expense' else '' }}>Expense</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select name="category">
+                    <option value="all" {{ 'selected' if filter_category == 'all' else '' }}>All Categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}" {{ 'selected' if filter_category == cat else '' }}>{{ cat }}</option>
+                    {% endfor %}
+                    {% for src in sources %}
+                    <option value="{{ src }}" {{ 'selected' if filter_category == src else '' }}>{{ src }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Month</label>
+                <select name="month">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}" {{ 'selected' if selected_month == m else '' }}>
+                        {{ ["", "January", "February", "March", "April", "May", "June",
+                             "July", "August", "September", "October", "November", "December"][m] }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Year</label>
+                <input type="number" name="year" value="{{ selected_year }}" min="2020" max="2099">
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+            <a href="{{ url_for('expenses.index') }}" class="btn btn-outline"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- Transactions Table -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-list-ul"></i> Transaction History</h2>
+        <span class="badge badge-secondary">{{ transactions|length }} records</span>
+    </div>
+    {% if transactions %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Type</th>
+                    <th class="text-right">Amount</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr>
+                    <td style="font-size:12px; white-space:nowrap;">{{ t.date }}</td>
+                    <td>{{ t.description }}</td>
+                    <td><span class="badge badge-secondary">{{ t.category }}</span></td>
+                    <td>
+                        {% if t.type == 'Income' %}
+                        <span class="badge badge-success"><i class="bi bi-arrow-down"></i> Income</span>
+                        {% else %}
+                        <span class="badge badge-secondary"><i class="bi bi-arrow-up"></i> Expense</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right font-bold {% if t.type == 'Income' %}text-success{% else %}text-danger{% endif %}">
+                        {% if t.type == 'Income' %}+₹{{ "{:,.0f}".format(t.amount) }}{% else %}-₹{{ "{:,.0f}".format(t.amount) }}{% endif %}
+                    </td>
+                    <td class="text-right">
+                        <div class="flex gap-2" style="justify-content:flex-end;">
+                            <button class="btn btn-outline btn-sm edit-txn-btn" data-id="{{ t.id }}" data-type="{{ t.type|lower }}" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="POST" action="{{ url_for('expenses.delete', txn_type=t.type|lower, txn_id=t.id) }}"
+                                  onsubmit="return confirmDelete(event, 'Are you sure you want to delete this transaction?')">
+                                <button type="submit" class="btn btn-danger btn-sm" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <p>No transactions found for {{ month_name }} {{ selected_year }}.</p>
+        <p class="mt-2">Click <strong>Add Transaction</strong> to create your first record.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="addTxnModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-plus-circle"></i> Add Transaction</h3>
+            <button class="modal-close" data-modal-close><i class="bi bi-x"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('expenses.add') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select name="type" id="txnType">
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select name="category" id="txnCategory"
+                            data-categories='{{ categories|tojson }}'
+                            data-sources='{{ sources|tojson }}'></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" name="description" placeholder="Optional description">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Amount (₹)</label>
+                        <input type="number" name="amount" step="0.01" min="0" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date</label>
+                        <input type="date" name="date" value="{{ today_date if today_date else '' }}">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Add Transaction</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Transaction Modal -->
+<div class="modal-overlay" id="editTxnModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Transaction</h3>
+            <button class="modal-close" data-modal-close><i class="bi bi-x"></i></button>
+        </div>
+        <form method="POST" action="" id="editTxnForm">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select name="type" id="editTxnType"
+                            data-categories='{{ categories|tojson }}'
+                            data-sources='{{ sources|tojson }}'>
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select name="category" id="editTxnCategory"
+                            data-categories='{{ categories|tojson }}'
+                            data-sources='{{ sources|tojson }}'>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                        {% for src in sources %}
+                        <option value="{{ src }}">{{ src }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" name="description" placeholder="Optional description">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Amount (₹)</label>
+                        <input type="number" name="amount" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date</label>
+                        <input type="date" name="date" required>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Set today's date as default for the add-transaction date input
+(function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('#addTxnModal input[type="date"]').forEach(i => { if (!i.value) i.value = today; });
+})();
+
+// Edit transaction modal — filter category options when type changes
+document.addEventListener('DOMContentLoaded', function() {
+    const editTypeSelect = document.getElementById('editTxnType');
+    if (editTypeSelect) {
+        editTypeSelect.onchange = function() {
+            const catSelect = document.getElementById('editTxnCategory');
+            const isIncome = editTypeSelect.value === 'income';
+            const sources = JSON.parse(catSelect.dataset.sources || '[]');
+            const cats = JSON.parse(catSelect.dataset.categories || '[]');
+            const options = isIncome ? sources : cats;
+            // Preserve current selection if it exists in the new list
+            const current = catSelect.value;
+            catSelect.innerHTML = options.map(c => `<option value="${c}">${c}</option>`).join('');
+            if (options.includes(current)) catSelect.value = current;
+        };
+    }
+
+    // Modal close handling for buttons using data-modal-close
+    document.querySelectorAll('[data-modal-close]').forEach(el => {
+        el.onclick = () => el.closest('.modal-overlay').classList.remove('active');
+    });
+});
+</script>
+{% endblock %}

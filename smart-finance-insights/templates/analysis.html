@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% block title %}Spending Analysis - Smart Finance Insights{% endblock %}
+{% block content %}
+{% set months = ['January', 'February', 'March', 'April', 'May', 'June',
+                 'July', 'August', 'September', 'October', 'November', 'December'] %}
+{% set chart_colors = ['#16a34a', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'] %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Spending Pattern Analysis</h1>
+        <p class="page-subtitle">{{ data.month_name }} {{ data.year }} &middot; Deep-dive into your spending habits</p>
+    </div>
+    <form method="GET" action="{{ url_for('intelligence.analysis') }}" class="flex items-center gap-2" style="flex-wrap:wrap;">
+        <select name="month" class="form-control" style="width:auto;">
+            {% for m_name in months %}
+            <option value="{{ loop.index }}" {% if loop.index == selected_month %}selected{% endif %}>{{ m_name }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" name="year" value="{{ selected_year }}" min="2020" max="2099" class="form-control" style="width:100px;">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+        <a href="{{ url_for('intelligence.budget_recommendations') }}" class="btn btn-outline"><i class="bi bi-lightbulb"></i> Budget Recs</a>
+    </form>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card expense">
+        <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+        <p class="stat-label">Total Spent</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.total_expense) }}</p>
+        <p class="stat-change negative"><i class="bi bi-calendar-month"></i> {{ data.month_name }} {{ data.year }}</p>
+    </div>
+    <div class="stat-card budget">
+        <div class="stat-icon"><i class="bi bi-receipt"></i></div>
+        <p class="stat-label">Transactions</p>
+        <p class="stat-value">{{ data.transaction_count }}</p>
+        <p class="stat-change positive"><i class="bi bi-list-ul"></i> Logged entries</p>
+    </div>
+    <div class="stat-card savings">
+        <div class="stat-icon"><i class="bi bi-calendar-day"></i></div>
+        <p class="stat-label">Avg Daily</p>
+        <p class="stat-value">₹{{ "{:,.0f}".format(data.avg_daily) }}</p>
+        <p class="stat-change positive"><i class="bi bi-graph-up"></i> Per day spend</p>
+    </div>
+    <div class="stat-card investment">
+        <div class="stat-icon"><i class="bi bi-trophy"></i></div>
+        <p class="stat-label">Top Category</p>
+        <p class="stat-value" style="font-size:20px;">{{ data.categories[0].category if data.categories else 'N/A' }}</p>
+        <p class="stat-change positive">
+            <i class="bi bi-percent"></i>
+            {{ "%.0f"|format(data.categories[0].percentage) if data.categories else 0 }}% of total
+        </p>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="grid grid-2 mb-4">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-graph-up-line"></i> Spending Trend</h2>
+            <span class="badge badge-secondary">Last 6 months</span>
+        </div>
+        <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="bi bi-pie-chart"></i> Category Breakdown</h2>
+            <span class="badge badge-primary">{{ data.categories|length }} categories</span>
+        </div>
+        <div class="chart-container">
+            <canvas id="categoryChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Category-wise Summary Table -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-table"></i> Category-wise Summary</h2>
+        <a href="{{ url_for('expenses.index') }}" class="btn btn-outline btn-sm"><i class="bi bi-plus-lg"></i> Add Transaction</a>
+    </div>
+    {% if data.categories %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th class="text-right">Count</th>
+                    <th class="text-right">Amount</th>
+                    <th class="text-right">Avg / Transaction</th>
+                    <th class="text-right">Percentage</th>
+                    <th style="min-width:160px;">Share</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in data.categories %}
+                <tr>
+                    <td>
+                        <span class="flex items-center gap-2">
+                            <span style="width:10px; height:10px; border-radius:50%; background:{{ chart_colors[loop.index0 % chart_colors|length] }}; display:inline-block;"></span>
+                            <strong>{{ c.category }}</strong>
+                        </span>
+                    </td>
+                    <td class="text-right">{{ c.count }}</td>
+                    <td class="text-right font-semibold">₹{{ "{:,.0f}".format(c.amount) }}</td>
+                    <td class="text-right text-muted">₹{{ "{:,.0f}".format(c.avg_per_txn) }}</td>
+                    <td class="text-right font-bold">{{ "%.1f"|format(c.percentage) }}%</td>
+                    <td>
+                        <div class="progress progress-sm">
+                            <div class="progress-bar {% if c.percentage >= 30 %}danger{% elif c.percentage >= 15 %}warning{% endif %}" style="width:{{ c.percentage }}%;"></div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background:var(--bg); font-weight:700;">
+                    <td>TOTAL</td>
+                    <td class="text-right">{{ data.transaction_count }}</td>
+                    <td class="text-right">₹{{ "{:,.0f}".format(data.total_expense) }}</td>
+                    <td class="text-right text-muted">—</td>
+                    <td class="text-right">100.0%</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <p>No transactions found for {{ data.month_name }} {{ data.year }}.</p>
+        <a href="{{ url_for('expenses.index') }}" class="btn btn-primary btn-sm mt-3"><i class="bi bi-plus-lg"></i> Add your first transaction</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- High Spending Categories Alert -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-exclamation-triangle"></i> High Spending Categories</h2>
+        <span class="badge badge-warning">≥ 15% of total</span>
+    </div>
+    {% if data.high_spending %}
+    <div class="flex items-center gap-2 mb-3" style="background:#fef3c7; border:1px solid #fcd34d; border-radius:var(--radius); padding:12px 14px;">
+        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size:18px;"></i>
+        <span style="font-size:13px; color:#92400e;">
+            The following categories account for <strong>{{ data.high_spending|length }}</strong> of your top spending buckets.
+            Consider setting budgets or reducing discretionary spend.
+        </span>
+    </div>
+    <div class="grid grid-3">
+        {% for c in data.high_spending %}
+        <div class="insight-card" style="border-left:4px solid var(--warning); flex-direction:column; align-items:flex-start; gap:8px;">
+            <div class="flex items-center justify-between" style="width:100%;">
+                <span class="flex items-center gap-2">
+                    <span class="insight-icon warning"><i class="bi bi-tag"></i></span>
+                    <strong>{{ c.category }}</strong>
+                </span>
+                <span class="badge badge-warning">{{ "%.1f"|format(c.percentage) }}%</span>
+            </div>
+            <div style="font-size:13px; color:var(--text-secondary);">
+                Spent <strong class="text-danger">₹{{ "{:,.0f}".format(c.amount) }}</strong>
+                across <strong>{{ c.count }}</strong> transactions.
+            </div>
+            <div class="progress progress-sm" style="width:100%;">
+                <div class="progress-bar warning" style="width:{{ c.percentage }}%;"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-check-circle text-success"></i>
+        <p>No single category dominates your spending this month. Great balance!</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const COLORS = ['#16a34a', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'];
+
+    // Spending Trend (line chart)
+    const trendData = {{ data.monthly_trend | tojson }};
+    createChart('trendChart', {
+        type: 'line',
+        data: {
+            labels: trendData.map(d => d.month),
+            datasets: [{
+                label: 'Monthly Spend',
+                data: trendData.map(d => d.amount),
+                borderColor: '#16a34a',
+                backgroundColor: 'rgba(22,163,74,0.15)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointBackgroundColor: '#16a34a',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => '₹' + ctx.parsed.y.toLocaleString('en-IN') } }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { callback: v => '₹' + (v/1000) + 'k' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Category Breakdown (doughnut chart)
+    const catData = {{ data.categories | tojson }};
+    createChart('categoryChart', {
+        type: 'doughnut',
+        data: {
+            labels: catData.map(c => c.category),
+            datasets: [{
+                data: catData.map(c => c.amount),
+                backgroundColor: COLORS,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '62%',
+            plugins: {
+                legend: { position: 'right', labels: { usePointStyle: true, padding: 10, font: { size: 12 } } },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+                            const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                            return ctx.label + ': ₹' + ctx.parsed.toLocaleString('en-IN') + ' (' + pct + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
