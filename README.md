@@ -281,18 +281,7 @@ smart-finance-insights/
 
 ---
 
-## Screenshots
 
-The dashboard includes:
-- **Sidebar navigation** with 13 menu items grouped by category
-- **Top bar** with search, notifications badge, JARVIS shortcut, user profile
-- **Stat cards** with icons, values, and trend indicators
-- **Interactive charts** (bar, doughnut, line) powered by Chart.js
-- **Data tables** with badges, progress bars, and action buttons
-- **Modal dialogs** for add/edit operations
-- **Flash messages** for user feedback
-- **Responsive design** that works on mobile and desktop
-- **Sticky footer** at the bottom of every page
 
 ### Color Scheme
 - Primary: Green (`#16a34a`)
