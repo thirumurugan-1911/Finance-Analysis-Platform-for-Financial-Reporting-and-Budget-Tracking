@@ -1,4 +1,4 @@
-# Smart Finance Insights
+# Finance Analysis Platform for Financial Reporting and Budget Tracking
 
 A complete, production-ready **personal finance management dashboard** built with **Python Flask** + **SQLite** + **Jinja2** templates. This project combines ALL features from 4 milestones into a single, fully-functional web application.
 
